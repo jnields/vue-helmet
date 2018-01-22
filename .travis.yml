@@ -1,0 +1,16 @@
+language: node_js
+node_js:
+- '8'
+script:
+- npm test && npm pack
+after_success:
+- npm run coverage
+deploy:
+  provider: npm
+  email: jnields+npm@gmail.com
+  on:
+    tags: true
+    branch: master
+  skip_cleanup: true
+  api_key:
+    secure: ncEr9Y5LtOyqT7VxWhbSenbf4yzTJl2DSMGVU0r/8p0iup8oQUE1j9BC8jSQu65z3HeEAPrQdQ8HYiUHnF/OZ/BKO01mGp4ytoNjB6vLbJLhvUXLIpbinWShGz1sT9fYa6UwJ0YXWt4/GQFJWCdiIACKv+2AWLiEoqBxL4QaGLx41Y80/S7hxOPG12ainF25vAPfajWdNPIZ66wtVzGcfL0XfDQv6ntR6wEw7bUow934D4gmO0NOQpf/5NjCzamCj2PDf94CiSM+4Igg9m81CDLL/e9uOoYJvFeFf7ssbDsdJ+YzyZyKl/C37tpdwlE8BcEQSQWy/CwayrGJlUXdwz/Y8nP7HDwdaEAsuU6N3I2bZt6X7QIgYNnB6sNuIQ9q2cQeFQtIGKf1sg7aYW9aSyoFsbS+BDq38ERFsMoZzUKjKjFX2CMAKNJoiJesE28Sh8H5IcAAbwnrtRFb3fGHI7ZwIhpiC7o9roOlnJB+j59MgPc/eCToz3murr98qVIfvurZUfPzC6UH6iw4v4wAHxpCA6AA+LoRorc2WNWU6IceWwT/SgQxrKdlfPMm4X6A641CHxZM4+cXimobeOx2hCXG+PzMTH6trcmcRIM5/jCjJLuJxuHvhuG5wQggKfbhofZFYiPoGhN9QoXjwffzKeJSWhOEHkr3tKVYy58Xkkk=

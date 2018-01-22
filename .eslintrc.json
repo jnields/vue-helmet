@@ -1,0 +1,17 @@
+{
+  "root": true,
+  "extends": "airbnb",
+  "parser": "babel-eslint",
+  "env": {
+    "browser": true,
+    "shared-node-browser": true,
+    "node": false
+  },
+  "globals": {
+    "process": true
+  },
+  "rules": {
+    "react/jsx-filename-extension": "off",
+    "react/no-unknown-property": "off"
+  }
+}

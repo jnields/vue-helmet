@@ -1,0 +1,69 @@
+{
+  "env": {
+    "commonjs": {
+        "presets": [
+            [
+              "env",
+              {
+                "targets": {
+                    "browsers": ["last 1 versions", "ie >= 10"]
+                },
+                "modules": "commonjs",
+                "loose": true,
+                "useBuiltIns": true
+              }
+            ]
+        ],
+        "plugins": [
+          "transform-runtime",
+          "transform-export-extensions",
+          "transform-class-properties",
+          "transform-object-rest-spread",
+          "transform-remove-strict-mode"
+        ]
+    },
+    "test": {
+      "plugins": [
+        [
+          "istanbul",
+          {
+            "exclude": [
+              "**/node_modules/**",
+              "**/packages/**",
+              "**/test/**",
+              "**/Test*"
+            ]
+          }
+        ],
+        "transform-es2015-modules-commonjs",
+        "transform-runtime",
+        "transform-vue-jsx",
+        "transform-export-extensions",
+        "transform-class-properties",
+        "transform-object-rest-spread",
+        "transform-remove-strict-mode"
+      ]
+    }
+  },
+  "presets": [
+    [
+      "env",
+      {
+        "targets": {
+          "browsers": ["last 1 versions", "ie >= 10"]
+        },
+        "modules": false,
+        "loose": true,
+        "useBuiltIns": true
+      }
+    ],
+    "flow"
+  ],
+  "plugins": [
+    "transform-runtime",
+    "transform-export-extensions",
+    "transform-class-properties",
+    "transform-object-rest-spread",
+    "transform-remove-strict-mode"
+  ]
+}

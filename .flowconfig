@@ -1,0 +1,6 @@
+[include]
+src
+test
+
+[libs]
+flow-typed

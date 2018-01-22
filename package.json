@@ -1,0 +1,142 @@
+{
+  "name": "@jnields/vue-helmet",
+  "description": "A document head manager for Vue",
+  "version": "1.0.0",
+  "main": "./lib/index.js",
+  "module": "./es/index.js",
+  "files": [
+    "es",
+    "lib"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Joseph Nields <jnields+npm@gmail.com>",
+  "contributors": [
+    "Joseph Nields <jnields+npm@gmail.com>"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jnields/vue-helmet"
+  },
+  "keywords": [
+    "vue-helmet",
+    "rei",
+    "vue",
+    "document",
+    "head",
+    "title",
+    "meta",
+    "link",
+    "script",
+    "base",
+    "noscript",
+    "style"
+  ],
+  "peerDependencies": {
+    "vue": "^2.2.1"
+  },
+  "dependencies": {
+    "classnames": "^2.2.5",
+    "escape-html": "^1.0.3",
+    "exenv": "^1.2.2",
+    "object-assign": "^4.1.1",
+    "raf": "^3.4.0",
+    "to-style": "^1.3.3"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-core": "^6.26.0",
+    "babel-eslint": "^8.1.2",
+    "babel-helper-vue-jsx-merge-props": "^2.0.3",
+    "babel-loader": "^6.4.1",
+    "babel-plugin-add-module-exports": "^0.2.1",
+    "babel-plugin-istanbul": "^4.0.0",
+    "babel-plugin-syntax-jsx": "^6.18.0",
+    "babel-plugin-transform-class-properties": "^6.23.0",
+    "babel-plugin-transform-es2015-modules-commonjs": "^6.26.0",
+    "babel-plugin-transform-export-extensions": "^6.22.0",
+    "babel-plugin-transform-object-rest-spread": "^6.23.0",
+    "babel-plugin-transform-remove-strict-mode": "^0.0.2",
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "babel-plugin-transform-vue-jsx": "^3.5.0",
+    "babel-preset-env": "^1.2.2",
+    "babel-preset-flow": "^6.23.0",
+    "babel-register": "^6.26.0",
+    "chai": "^3.5.0",
+    "codecov": "^2.1.0",
+    "conventional-changelog-cli": "^1.3.1",
+    "coveralls": "^3.0.0",
+    "cross-env": "^3.2.4",
+    "cz-conventional-changelog": "^2.0.0",
+    "eslint": "^4.15.0",
+    "eslint-config-airbnb": "^16.1.0",
+    "eslint-plugin-import": "^2.8.0",
+    "eslint-plugin-jsx-a11y": "^6.0.3",
+    "eslint-plugin-react": "^7.5.1",
+    "flow-bin": "^0.63.1",
+    "istanbul": "^0.4.5",
+    "karma": "^1.5.0",
+    "karma-chai": "^0.1.0",
+    "karma-chai-sinon": "^0.1.5",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-coverage": "^1.1.1",
+    "karma-firefox-launcher": "^1.1.0",
+    "karma-html-reporter": "^0.2.7",
+    "karma-mocha": "^1.3.0",
+    "karma-phantomjs-launcher": "^1.0.4",
+    "karma-phantomjs-shim": "^1.4.0",
+    "karma-sourcemap-loader": "^0.3.7",
+    "karma-spec-reporter": "^0.0.30",
+    "karma-tap-reporter": "^0.0.6",
+    "karma-webpack": "^2.0.9",
+    "mocha": "^3.2.0",
+    "nyc": "^11.4.1",
+    "phantomjs-prebuilt": "^2.1.14",
+    "rimraf": "^2.6.1",
+    "sinon": "^2.1.0",
+    "sinon-chai": "^2.8.0",
+    "vue": "^2.2.1",
+    "vue-server-renderer": "^2.5.13",
+    "webpack": "^2.2.1"
+  },
+  "scripts": {
+    "babel": "BABEL_ENV=test babel-node",
+    "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
+    "clean": "rimraf lib coverage es .nyc_output",
+    "lint": "eslint --ignore-path .gitignore .",
+    "pretest": "npm run clean && npm run lint && flow check",
+    "test": "npm run test:browser && npm run test:server",
+    "test:browser": "cross-env BABEL_ENV=test karma start karma.config.js",
+    "test:server": "cross-env BABEL_ENV=test nyc --reporter json mocha -r babel-register ./test/server.spec.js",
+    "posttest": "istanbul report lcov text",
+    "coverage": "istanbul report text-lcov | coveralls",
+    "prepublishOnly": "npm t",
+    "commit": "git-cz",
+    "prepare": "npm run compile:commonjs && npm run compile:es",
+    "compile:commonjs": "cross-env BABEL_ENV=commonjs babel src --out-dir lib",
+    "compile:es": "cross-env BABEL_ENV=es babel src --out-dir es --ignore test.js"
+  },
+  "nyc": {
+    "require": [
+      "babel-register"
+    ],
+    "sourceMap": false,
+    "instrument": false,
+    "include": [
+      "src/**/*.js"
+    ],
+    "exclude": [
+      "test/**/*",
+      "node_modules/**/*"
+    ],
+    "all": false,
+    "report-dir": "./coverage"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  }
+}
