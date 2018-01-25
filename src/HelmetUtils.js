@@ -269,17 +269,17 @@ const generateTitleAsString = (
 
 const generateTagsAsString = (type: string, tags: Array<MapType>): string =>
   tags.map((tag) => {
-    const attributeHtml = Object.keys(tag)
+    let attributeHtml = Object.keys(tag)
       .filter(attribute => attribute !== 'innerHTML' && attribute !== 'cssText')
       .map(attribute => (
         tag[attribute] === undefined
           ? attribute
           : `${attribute}="${escapeHtml(tag[attribute])}"`
       )).join(' ');
-
+    if (attributeHtml) attributeHtml = ` ${attributeHtml}`;
     const isSelfClosing = SELF_CLOSING_TAGS.indexOf(type) === -1;
 
-    return `<${type} ${HELMET_ATTRIBUTE}="true" ${attributeHtml}${
+    return `<${type} ${HELMET_ATTRIBUTE}="true"${attributeHtml}${
       isSelfClosing
         ? '/>'
         : `>${tag.innerHTML || tag.cssText || ''}</${type}>`
