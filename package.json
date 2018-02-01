@@ -106,7 +106,7 @@
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "clean": "rimraf lib coverage es .nyc_output",
     "lint": "eslint --ignore-path .gitignore .",
-    "pretest": "npm run clean && npm run lint && flow check",
+    "pretest": "npm run lint && flow check",
     "test": "npm run test:browser && npm run test:server",
     "test:browser": "cross-env BABEL_ENV=test karma start karma.config.js",
     "test:server": "cross-env BABEL_ENV=test nyc --reporter json mocha -r babel-register ./test/server.spec.js",
