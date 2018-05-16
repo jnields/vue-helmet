@@ -7,7 +7,7 @@ import Vue from 'vue';
 import requestAnimationFrame from 'raf';
 import sinon from 'sinon';
 import { expect } from 'chai';
-import Helmet, { HelmetContext, HelmetProvider } from '../src/index';
+import { Helmet, HelmetContext, HelmetProvider } from '../src/index';
 import { HELMET_ATTRIBUTE } from '../src/HelmetConstants';
 
 describe('Helmet - Declarative API', () => {

@@ -275,4 +275,5 @@ const createHelmet = (contextKey?: string) => {
     },
   };
 };
-export default createHelmet();
+
+export const Helmet = createHelmet();

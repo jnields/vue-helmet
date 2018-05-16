@@ -8,7 +8,7 @@ import { createRenderer } from 'vue-server-renderer';
 
 import requestAnimationFrame from 'raf';
 import { expect } from 'chai';
-import Helmet, { HelmetContext, HelmetProvider } from '../src/index';
+import { Helmet, HelmetContext, HelmetProvider } from '../src/index';
 import { HELMET_ATTRIBUTE } from '../src/HelmetConstants';
 
 // const serverRendered = 'data-server-rendered="true"';
