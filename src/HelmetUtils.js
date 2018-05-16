@@ -1,9 +1,9 @@
 // @flow
 import raf from 'raf';
-import { string as toStyleString } from 'to-style';
+import toStyle from 'to-style';
 import cs from 'classnames';
 import escapeHtml from 'escape-html';
-import objectAssign from 'object-assign';
+
 import {
   ATTRIBUTE_NAMES,
   HELMET_ATTRIBUTE,
@@ -189,11 +189,10 @@ function getTagsFromPropsList(
       // Update seen tags with tags from this instance
       const keys = Object.keys(instanceSeenTags);
       keys.forEach((attributeKey) => {
-        const tagUnion = objectAssign(
-          {},
-          approvedSeenTags[attributeKey],
-          instanceSeenTags[attributeKey],
-        );
+        const tagUnion = {
+          ...approvedSeenTags[attributeKey],
+          ...instanceSeenTags[attributeKey],
+        };
         approvedSeenTags[attributeKey] = tagUnion;
       });
       return approvedTags;
@@ -297,7 +296,7 @@ function convertVNodeDataToMap(data: VNodeDataType, initAttributes?: VNodeDataTy
     cssText, innerHTML,
   } = { ...initDomProps, ...domProps };
   const result = {};
-  if (style || initStyle) result.style = toStyleString(style || initStyle);
+  if (style || initStyle) result.style = toStyle.string(style || initStyle);
   if (innerHTML) result.innerHTML = innerHTML;
   if (cssText) result.cssText = cssText;
   if (className || initClassName) result.class = cs(className || initClassName);

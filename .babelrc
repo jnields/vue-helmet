@@ -1,26 +1,29 @@
 {
+  "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "modules": false
+        }
+      ],
+      "@babel/preset-flow"
+  ],
+  "plugins": [
+    "@babel/plugin-transform-runtime",
+    "@babel/plugin-proposal-class-properties"
+  ],
   "env": {
-    "commonjs": {
-        "presets": [
-            [
-              "env",
-              {
-                "modules": "commonjs",
-                "loose": true,
-                "useBuiltIns": true
-              }
-            ]
-        ],
-        "plugins": [
-          "transform-runtime",
-          "transform-export-extensions",
-          "transform-class-properties",
-          "transform-object-rest-spread",
-          "transform-remove-strict-mode"
-        ]
-    },
     "test": {
+      "presets": [
+        [
+          "@babel/preset-env",
+          {
+            "modules": "commonjs"
+          }
+        ]
+      ],
       "plugins": [
+        "transform-vue-jsx",
         [
           "istanbul",
           {
@@ -32,32 +35,7 @@
             ]
           }
         ],
-        "transform-es2015-modules-commonjs",
-        "transform-runtime",
-        "transform-vue-jsx",
-        "transform-export-extensions",
-        "transform-class-properties",
-        "transform-object-rest-spread",
-        "transform-remove-strict-mode"
       ]
     }
   },
-  "presets": [
-    [
-      "env",
-      {
-        "modules": false,
-        "loose": true,
-        "useBuiltIns": true
-      }
-    ],
-    "flow"
-  ],
-  "plugins": [
-    "transform-runtime",
-    "transform-export-extensions",
-    "transform-class-properties",
-    "transform-object-rest-spread",
-    "transform-remove-strict-mode"
-  ]
 }
