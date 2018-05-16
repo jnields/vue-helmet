@@ -40,7 +40,7 @@ You may use the props `defaultTitle`, `titleTemplate`, and `handleClientStateCha
 ```js
 // app.js
 import Vue from 'vue';
-import Helmet, { HelmetContext, HelmetProvider } from '@jnields/vue-helmet';
+import { Helmet, HelmetContext, HelmetProvider } from '@jnields/vue-helmet';
 
 export default Vue.extend({
   name: 'app',
