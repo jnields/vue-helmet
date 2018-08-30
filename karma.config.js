@@ -17,7 +17,6 @@ module.exports = function init(config) {
     client: {
       mocha: {
         bail: true,
-        reporter: 'html',
       },
     },
 

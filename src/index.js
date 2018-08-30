@@ -1,9 +1,7 @@
 // @flow
-import withSideEffect, { Context } from './VueSideEffect';
+import withSideEffect from './withSideEffect';
 import type {
   HelmetPropsType,
-  ClientStateType,
-  ServerStateType,
   MapType,
   VNodeType,
   ValidTagsType,
@@ -18,44 +16,6 @@ import {
   warn,
 } from './HelmetUtils';
 import { VALID_TAG_NAMES } from './HelmetConstants';
-
-export { ContextProvider as HelmetProvider } from './VueSideEffect';
-
-export class HelmetContext extends Context<HelmetPropsType, ClientStateType, ServerStateType> {
-  constructor() {
-    super(
-      reducePropsToState,
-      handleClientStateChange,
-      mapStateOnServer,
-    );
-  }
-
-  // $FlowFixMe
-  static get canUseDOM() {
-    return Context.canUseDOM;
-  }
-
-  // $FlowFixMe
-  static set canUseDOM(value) {
-    Context.canUseDOM = value;
-  }
-
-  rewind(): ServerStateType {
-    return (super.rewind() || mapStateOnServer({
-      baseTag: [],
-      bodyAttributes: {},
-      htmlAttributes: {},
-      linkTags: [],
-      metaTags: [],
-      noscriptTags: [],
-      handleClientStateChange: () => {},
-      scriptTags: [],
-      styleTags: [],
-      title: '',
-      titleAttributes: {},
-    }));
-  }
-}
 
 type ArrayPropsMap = {| [HelmetPropsArrayTypes]: Array<MapType> |};
 
@@ -130,16 +90,28 @@ function mapObjectTypeChildren({
   switch (tag) {
     case 'title':
       result.title = extractTitle(nestedChildren);
-      result.titleAttributes = { ...newChildData };
+      result.titleAttributes = {
+        ...result.titleAttributes,
+        ...newChildData,
+      };
       break;
     case 'body':
-      result.bodyAttributes = { ...newChildData };
+      result.bodyAttributes = {
+        ...result.bodyAttributes,
+        ...newChildData,
+      };
       break;
     case 'html':
-      result.htmlAttributes = { ...newChildData };
+      result.htmlAttributes = {
+        ...result.htmlAttributes,
+        ...newChildData,
+      };
       break;
     default:
-      result[tag] = { ...newChildData };
+      result[tag] = {
+        ...result[tag],
+        ...newChildData,
+      };
       break;
   }
   return result;
@@ -256,24 +228,27 @@ const NullComponent = {
   render: () => null,
 };
 
-const createHelmet = (contextKey?: string) => {
-  const SideEffect = withSideEffect(NullComponent, contextKey);
-  return {
-    name: 'vue-helmet',
-    props: {
-      defaultTitle: String,
-      titleTemplate: String,
-      handleClientStateChange: Function,
-    },
-    render(h: *) {
-      const children: ?Array<VNodeType> = this.$slots.default;
-      let newProps: HelmetPropsType = this.$props;
-      if (children) {
-        newProps = mapChildrenToProps(children, newProps);
-      }
-      return h(SideEffect, { props: newProps }, this.$slots.default);
-    },
-  };
-};
+const { Provider, Consumer } = withSideEffect(
+  reducePropsToState,
+  handleClientStateChange,
+  mapStateOnServer,
+)(NullComponent, 'helmet-provider');
 
-export const Helmet = createHelmet();
+export const HelmetProvider = Provider;
+
+export const Helmet = {
+  name: 'helmet',
+  props: {
+    defaultTitle: String,
+    titleTemplate: String,
+    handleClientStateChange: Function,
+  },
+  render(h: *) {
+    const children: ?Array<VNodeType> = this.$slots.default;
+    let newProps: HelmetPropsType = this.$props;
+    if (children) {
+      newProps = mapChildrenToProps(children, newProps);
+    }
+    return h(Consumer, { props: newProps }, this.$slots.default);
+  },
+};

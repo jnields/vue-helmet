@@ -1,33 +1,37 @@
 /** @jsx h */
-/* eslint max-nested-callbacks: [1, 7] */
-/* eslint-disable react/jsx-sort-props */
-/* eslint-disable jsx-a11y/html-has-lang */
 /* eslint-env browser */
+/* eslint max-nested-callbacks: [1, 7] */
+/* eslint-disable jsx-a11y/html-has-lang */
+import Promise from '@babel/runtime/core-js/promise';
 import Vue from 'vue';
-import requestAnimationFrame from 'raf';
 import sinon from 'sinon';
-import { expect } from 'chai';
-import { Helmet, HelmetContext, HelmetProvider } from '../src/index';
+import { assert, expect } from 'chai';
+import { Helmet, HelmetProvider } from '../src/index';
 import { HELMET_ATTRIBUTE } from '../src/HelmetConstants';
+
+Vue.config.productionTip = false;
+
+window.Promise = Promise; // needed for PhantomJS
 
 describe('Helmet - Declarative API', () => {
   let headElement;
   const container = document.createElement('div');
-  let helmetContext;
   let vm;
+  let staticContext;
   beforeEach(() => {
     headElement =
       headElement || document.head || document.querySelector('head');
-    helmetContext = new HelmetContext();
     // resets DOM after each run
     headElement.innerHTML = '';
   });
 
-  function render(renderFunction) {
+  function render(renderFunction, errorCaptured) {
+    staticContext = {};
     const Component = Vue.extend({
+      errorCaptured,
       render(h) {
         return (
-          <HelmetProvider context={helmetContext}>
+          <HelmetProvider context={staticContext}>
             {h({ render: renderFunction })}
           </HelmetProvider>
         );
@@ -35,284 +39,214 @@ describe('Helmet - Declarative API', () => {
     });
     vm = new Component();
     vm.$mount(container);
+    return vm.$nextTick().then(() => vm.$nextTick());
   }
 
-  afterEach(() => {
-    if (vm) vm.$destroy();
-    vm = undefined;
+  function rerender() {
+    vm.$forceUpdate();
+    return vm.$nextTick().then(() => vm.$nextTick());
+  }
+
+  afterEach((done) => {
+    if (vm) {
+      vm.$destroy();
+      vm = undefined;
+      Vue.nextTick(done);
+    } else {
+      vm = undefined;
+      done();
+    }
   });
 
   describe('api', () => {
     describe('title', () => {
-      it('updates page title', (done) => {
-        render(h => (
-          <Helmet defaultTitle="Fallback">
-            <title>Test Title</title>
-          </Helmet>
-        ));
+      it('updates page title', () => render(h => (
+        <Helmet defaultTitle="Fallback">
+          <title>Test Title</title>
+        </Helmet>
+      )).then(() => {
+        expect(document.title).to.equal('Test Title');
+      }));
 
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Test Title');
-          done();
-        });
-      });
-
-      it('updates page title and allows children containing expressions', (done) => {
+      it('updates page title and allows children containing expressions', () => {
         const someValue = 'Some Great Title';
 
-        render(h => (
+        return render(h => (
           <Helmet>
             <title>Title: {someValue}</title>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(document.title).to.equal('Title: Some Great Title');
-
-          done();
         });
       });
 
-      it('updates page title with multiple children', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <title>Test Title</title>
-            </Helmet>
-            <Helmet>
-              <title>Child One Title</title>
-            </Helmet>
-            <Helmet>
-              <title>Child Two Title</title>
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Child Two Title');
-
-          done();
-        });
-      });
-
-      it('sets title based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <title>Main Title</title>
-            </Helmet>
-            <Helmet>
-              <title>Nested Title</title>
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Nested Title');
-
-          done();
-        });
-      });
-
-      it('sets title using deepest nested component with a defined title', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <title>Main Title</title>
-            </Helmet>
-            <Helmet />
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Main Title');
-
-          done();
-        });
-      });
-
-      it('uses defaultTitle if no title is defined', (done) => {
-        render(h => (
-          <Helmet
-            defaultTitle="Fallback"
-            titleTemplate="This is a %s of the titleTemplate feature"
-          >
-            <title />
+      it('updates page title with multiple children', () => render(h => (
+        <div>
+          <Helmet>
+            <title>Test Title</title>
           </Helmet>
-        ));
+          <Helmet>
+            <title>Child One Title</title>
+          </Helmet>
+          <Helmet>
+            <title>Child Two Title</title>
+          </Helmet>
+        </div>
+      )).then(() => {
+        expect(document.title).to.equal('Child Two Title');
+      }));
 
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Fallback');
+      it('sets title based on deepest nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <title>Main Title</title>
+          </Helmet>
+          <Helmet>
+            <title>Nested Title</title>
+          </Helmet>
+        </div>
+      )).then(() => {
+        expect(document.title).to.equal('Nested Title');
+      }));
 
-          done();
-        });
-      });
+      it('sets title using deepest nested component with a defined title', () => render(h => (
+        <div>
+          <Helmet>
+            <title>Main Title</title>
+          </Helmet>
+          <Helmet />
+        </div>
+      )).then(() => {
+        expect(document.title).to.equal('Main Title');
+      }));
 
-      it('uses a titleTemplate if defined', (done) => {
-        render(h => (
+      it('uses defaultTitle if no title is defined', () => render(h => (
+        <Helmet
+          defaultTitle="Fallback"
+          titleTemplate="This is a %s of the titleTemplate feature"
+        >
+          <title />
+        </Helmet>
+      )).then(() => {
+        expect(document.title).to.equal('Fallback');
+      }));
+
+      it('uses a titleTemplate if defined', () => render(h => (
+        <Helmet
+          defaultTitle="Fallback"
+          titleTemplate="This is a %s of the titleTemplate feature"
+        >
+          <title>Test</title>
+        </Helmet>
+      )).then(() => {
+        expect(document.title).to.equal('This is a Test of the titleTemplate feature');
+      }));
+
+      it('replaces multiple title strings in titleTemplate', () => render(h => (
+        <Helmet
+          titleTemplate="This is a %s of the titleTemplate feature. Another %s."
+        >
+          <title>Test</title>
+        </Helmet>
+      )).then(() => {
+        expect(document.title).to.equal('This is a Test of the titleTemplate feature. Another Test.');
+      }));
+
+      it('uses a titleTemplate based on deepest nested component', () => render(h => (
+        <div>
           <Helmet
-            defaultTitle="Fallback"
             titleTemplate="This is a %s of the titleTemplate feature"
           >
             <title>Test</title>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('This is a Test of the titleTemplate feature');
-
-          done();
-        });
-      });
-
-      it('replaces multiple title strings in titleTemplate', (done) => {
-        render(h => (
           <Helmet
-            titleTemplate="This is a %s of the titleTemplate feature. Another %s."
+            titleTemplate="A %s using nested titleTemplate attributes"
+          >
+            <title>Second Test</title>
+          </Helmet>
+        </div>
+      )).then(() => {
+        expect(document.title).to.equal('A Second Test using nested titleTemplate attributes');
+      }));
+
+      it('merges deepest component title with nearest upstream titleTemplate', () => render(h => (
+        <div>
+          <Helmet
+            titleTemplate="This is a %s of the titleTemplate feature"
           >
             <title>Test</title>
           </Helmet>
-        ));
+          <Helmet>
+            <title>Second Test</title>
+          </Helmet>
+        </div>
+      )).then(() => {
+        expect(document.title).to.equal('This is a Second Test of the titleTemplate feature');
+      }));
 
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('This is a Test of the titleTemplate feature. Another Test.');
-
-          done();
-        });
-      });
-
-      it('uses a titleTemplate based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet
-              titleTemplate="This is a %s of the titleTemplate feature"
-            >
-              <title>Test</title>
-            </Helmet>
-            <Helmet
-              titleTemplate="A %s using nested titleTemplate attributes"
-            >
-              <title>Second Test</title>
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('A Second Test using nested titleTemplate attributes');
-
-          done();
-        });
-      });
-
-      it('merges deepest component title with nearest upstream titleTemplate', (done) => {
-        render(h => (
-          <div>
-            <Helmet
-              titleTemplate="This is a %s of the titleTemplate feature"
-            >
-              <title>Test</title>
-            </Helmet>
-            <Helmet>
-              <title>Second Test</title>
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('This is a Second Test of the titleTemplate feature');
-
-          done();
-        });
-      });
-
-      it('renders dollar characters in a title correctly when titleTemplate present', (done) => {
+      it('return renders dollar characters in a title correctly when titleTemplate present', () => {
         const dollarTitle = 'te$t te$$t te$$$t te$$$$t';
 
-        render(h => (
+        return render(h => (
           <Helmet titleTemplate="This is a %s">
             <title>{dollarTitle}</title>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(document.title).to.equal('This is a te$t te$$t te$$$t te$$$$t');
-
-          done();
         });
       });
 
-      it('does not encode all characters with HTML character entity equivalents', (done) => {
+      it('does not encode all characters with HTML character entity equivalents', () => {
         const chineseTitle = '膣膗 鍆錌雔';
 
-        render(h => (
+        return render(h => (
           <Helmet>
             <title>{chineseTitle}</title>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(document.title).to.equal(chineseTitle);
-
-          done();
         });
       });
 
-      it('page title with prop itemProp', (done) => {
-        render(h => (
-          <Helmet defaultTitle="Fallback">
-            <title itemprop="name">Test Title with itemprop</title>
-          </Helmet>
-        ));
+      it('page title with prop itemProp', () => render(h => (
+        <Helmet defaultTitle="Fallback">
+          <title itemprop="name">Test Title with itemprop</title>
+        </Helmet>
+      )).then(() => {
+        const titleTag = document.getElementsByTagName('title')[0];
+        expect(document.title).to.equal('Test Title with itemprop');
+        expect(titleTag.getAttribute('itemprop')).to.equal('name');
+      }));
 
-        requestAnimationFrame(() => {
-          const titleTag = document.getElementsByTagName('title')[0];
-          expect(document.title).to.equal('Test Title with itemprop');
-          expect(titleTag.getAttribute('itemprop')).to.equal('name');
-
-          done();
-        });
-      });
-
-      it('retains existing title tag when no title tag is defined', (done) => {
+      it('retains existing title tag when no title tag is defined', () => {
         headElement.innerHTML = '<title>Existing Title</title>';
 
-        render(h => (
+        return render(h => (
           <Helmet>
             <meta name="keywords" content="stuff" />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(document.title).to.equal('Existing Title');
-
-          done();
         });
       });
 
-      it('clears title tag if empty title is defined', (done) => {
-        render(h => (
+      it('clears title tag if empty title is defined', () => render(h => (
+        <Helmet>
+          <title>Existing Title</title>
+          <meta name="keywords" content="stuff" />
+        </Helmet>
+      )).then(() => {
+        expect(document.title).to.equal('Existing Title');
+
+        return render(h => (
           <Helmet>
-            <title>Existing Title</title>
+            {h('title', null, '')}
             <meta name="keywords" content="stuff" />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(document.title).to.equal('Existing Title');
-
-          render(h => (
-            <Helmet>
-              {h('title', null, '')}
-              <meta name="keywords" content="stuff" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            expect(document.title).to.equal('');
-            done();
-          });
+        )).then(() => {
+          expect(document.title).to.equal('');
         });
-      });
+      }));
     });
 
     describe('title attributes', () => {
@@ -320,220 +254,151 @@ describe('Helmet - Declarative API', () => {
         headElement.innerHTML = '<title>Test Title</title>';
       });
 
-      it('updates title attributes', (done) => {
-        render(h => (
-          <Helmet>
-            <title itemprop="name" />
-          </Helmet>
-        ));
+      it('updates title attributes', () => render(h => (
+        <Helmet>
+          <title itemprop="name" />
+        </Helmet>
+      )).then(() => {
+        const titleTag = document.getElementsByTagName('title')[0];
 
-        requestAnimationFrame(() => {
-          const titleTag = document.getElementsByTagName('title')[0];
+        expect(titleTag.getAttribute('itemprop')).to.equal('name');
+        expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('itemprop');
+      }));
 
-          expect(titleTag.getAttribute('itemprop')).to.equal('name');
-          expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('itemprop');
-
-          done();
-        });
-      });
-
-      it('sets attributes based on the deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <title lang="en" hidden />
-            </Helmet>
-            <Helmet>
-              <title lang="ja" />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const titleTag = document.getElementsByTagName('title')[0];
-
-          expect(titleTag.getAttribute('lang')).to.equal('ja');
-          expect(titleTag.getAttribute('hidden')).to.equal('true');
-          expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,lang');
-
-          done();
-        });
-      });
-
-      it('handles valueless attributes', (done) => {
-        render(h => (
-          <Helmet>
-            <title hidden />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const titleTag = document.getElementsByTagName('title')[0];
-
-          expect(titleTag.getAttribute('hidden')).to.equal('true');
-          expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden');
-
-          done();
-        });
-      });
-
-      it('clears title attributes that are handled within helmet', (done) => {
-        render(h => (
+      it('sets attributes based on the deepest nested component', () => render(h => (
+        <div>
           <Helmet>
             <title lang="en" hidden />
           </Helmet>
-        ));
+          <Helmet>
+            <title lang="ja" />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const titleTag = document.getElementsByTagName('title')[0];
 
-        requestAnimationFrame(() => {
-          render(h => <Helmet><title lang={null} hidden={null} /></Helmet>);
+        expect(titleTag.getAttribute('lang')).to.equal('ja');
+        expect(titleTag.getAttribute('hidden')).to.equal('true');
+        expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,lang');
+      }));
 
-          requestAnimationFrame(() => {
-            const titleTag = document.getElementsByTagName('title')[0];
+      it('handles valueless attributes', () => render(h => (
+        <Helmet>
+          <title hidden />
+        </Helmet>
+      )).then(() => {
+        const titleTag = document.getElementsByTagName('title')[0];
 
-            expect(titleTag.getAttribute('lang')).to.equal(null);
-            expect(titleTag.getAttribute('hidden')).to.equal(null);
-            expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        expect(titleTag.getAttribute('hidden')).to.equal('true');
+        expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden');
+      }));
 
-            done();
-          });
-        });
-      });
+      it('clears title attributes that are handled within helmet', () => render(h => (
+        <Helmet>
+          <title lang="en" hidden />
+        </Helmet>
+      )).then(() => render(h => <Helmet><title lang={null} hidden={null} /></Helmet>).then(() => {
+        const titleTag = document.getElementsByTagName('title')[0];
+
+        expect(titleTag.getAttribute('lang')).to.equal(null);
+        expect(titleTag.getAttribute('hidden')).to.equal(null);
+        expect(titleTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+      })));
     });
 
     describe('html attributes', () => {
-      it('updates html attributes', (done) => {
-        render(h => (
-          <Helmet>
-            <html class="myClassName" lang="en" />
-          </Helmet>
-        ));
+      it('updates html attributes', () => render(h => (
+        <Helmet>
+          <html class="myClassName" lang="en" />
+        </Helmet>
+      )).then(() => {
+        const htmlTag = document.getElementsByTagName('html')[0];
 
-        requestAnimationFrame(() => {
+        expect(htmlTag.getAttribute('class')).to.equal('myClassName');
+        expect(htmlTag.getAttribute('lang')).to.equal('en');
+        expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('class,lang');
+      }));
+
+      it('sets attributes based on the deepest nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <html lang="en" />
+          </Helmet>
+          <Helmet>
+            <html lang="ja" />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const htmlTag = document.getElementsByTagName('html')[0];
+
+        expect(htmlTag.getAttribute('lang')).to.equal('ja');
+        expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('lang');
+      }));
+
+      it('handles valueless attributes', () => render(h => (
+        <Helmet>
+          <html amp />
+        </Helmet>
+      )).then(() => {
+        const htmlTag = document.getElementsByTagName('html')[0];
+
+        expect(htmlTag.getAttribute('amp')).to.equal('true');
+        expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp');
+      }));
+
+      it('clears html attributes that are handled within helmet', () => render(h => (
+        <Helmet>
+          <html lang="en" amp />
+        </Helmet>
+      )).then(() =>
+      // eslint-disable-next-line jsx-a11y/lang
+        render(h => <Helmet><html lang={null} amp={null} /></Helmet>, container).then(() => {
           const htmlTag = document.getElementsByTagName('html')[0];
 
-          expect(htmlTag.getAttribute('class')).to.equal('myClassName');
-          expect(htmlTag.getAttribute('lang')).to.equal('en');
-          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('class,lang');
+          expect(htmlTag.getAttribute('lang')).to.equal(null);
+          expect(htmlTag.getAttribute('amp')).to.equal(null);
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        })));
 
-          done();
-        });
-      });
-
-      it('sets attributes based on the deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <html lang="en" />
-            </Helmet>
-            <Helmet>
-              <html lang="ja" />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const htmlTag = document.getElementsByTagName('html')[0];
-
-          expect(htmlTag.getAttribute('lang')).to.equal('ja');
-          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('lang');
-
-          done();
-        });
-      });
-
-      it('handles valueless attributes', (done) => {
-        render(h => (
+      it('updates with multiple additions and removals - overwrite and new', () => {
+        const data = { updated: false };
+        return render(h => (
           <Helmet>
-            <html amp />
+            <html lang="en" amp />
+            {data.updated && <html lang="ja" id="html-tag" title="html tag" />}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
+          data.updated = true;
+          return rerender();
+        }).then(() => {
           const htmlTag = document.getElementsByTagName('html')[0];
 
           expect(htmlTag.getAttribute('amp')).to.equal('true');
-          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp');
-
-          done();
+          expect(htmlTag.getAttribute('lang')).to.equal('ja');
+          expect(htmlTag.getAttribute('id')).to.equal('html-tag');
+          expect(htmlTag.getAttribute('title')).to.equal('html tag');
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp,id,lang,title');
         });
       });
 
-      it('clears html attributes that are handled within helmet', (done) => {
-        render(h => (
+      it('updates with multiple additions and removals - all new', () => {
+        const data = { updated: false };
+        return render(h => (
           <Helmet>
             <html lang="en" amp />
+            {data.updated && <html id="html-tag" title="html tag" />}
           </Helmet>
-        ));
+        )).then(() => {
+          data.updated = true;
+          return rerender();
+        }).then(() => {
+          const htmlTag = document.getElementsByTagName('html')[0];
 
-        requestAnimationFrame(() => {
-          // eslint-disable-next-line jsx-a11y/lang
-          render(h => <Helmet><html lang={null} amp={null} /></Helmet>, container);
-
-          requestAnimationFrame(() => {
-            const htmlTag = document.getElementsByTagName('html')[0];
-
-            expect(htmlTag.getAttribute('lang')).to.equal(null);
-            expect(htmlTag.getAttribute('amp')).to.equal(null);
-            expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
-
-            done();
-          });
-        });
-      });
-
-      it('updates with multiple additions and removals - overwrite and new', (done) => {
-        render(h => (
-          <Helmet>
-            <html lang="en" amp />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => (
-            <Helmet>
-              <html lang="ja" id="html-tag" title="html tag" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            const htmlTag = document.getElementsByTagName('html')[0];
-
-            expect(htmlTag.getAttribute('amp')).to.equal('true');
-            expect(htmlTag.getAttribute('lang')).to.equal('ja');
-            expect(htmlTag.getAttribute('id')).to.equal('html-tag');
-            expect(htmlTag.getAttribute('title')).to.equal('html tag');
-            expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp,id,lang,title');
-
-            done();
-          });
-        });
-      });
-
-      it('updates with multiple additions and removals - all new', (done) => {
-        render(h => (
-          <Helmet>
-            <html lang="en" amp />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => (
-            <Helmet>
-              <html id="html-tag" title="html tag" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            const htmlTag = document.getElementsByTagName('html')[0];
-
-            expect(htmlTag.getAttribute('amp')).to.equal('true');
-            expect(htmlTag.getAttribute('lang')).to.equal('en');
-            expect(htmlTag.getAttribute('id')).to.equal('html-tag');
-            expect(htmlTag.getAttribute('title')).to.equal('html tag');
-            expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp,id,lang,title');
-
-            done();
-          });
+          expect(htmlTag.getAttribute('amp')).to.equal('true');
+          expect(htmlTag.getAttribute('lang')).to.equal('en');
+          expect(htmlTag.getAttribute('id')).to.equal('html-tag');
+          expect(htmlTag.getAttribute('title')).to.equal('html tag');
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp,id,lang,title');
         });
       });
 
@@ -543,56 +408,34 @@ describe('Helmet - Declarative API', () => {
           htmlTag.setAttribute('test', 'test');
         });
 
-        it('are not cleared', (done) => {
-          render(h => <Helmet />, container);
+        it('are not cleared', () => render(h => <Helmet />, container).then(() => {
+          const htmlTag = document.getElementsByTagName('html')[0];
 
-          requestAnimationFrame(() => {
-            const htmlTag = document.getElementsByTagName('html')[0];
+          expect(htmlTag.getAttribute('test')).to.equal('test');
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        }));
 
-            expect(htmlTag.getAttribute('test')).to.equal('test');
-            expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        it('overwritten if specified in helmet', () => render(h => (
+          <Helmet>
+            <html test="helmet-attr" />
+          </Helmet>
+        )).then(() => {
+          const htmlTag = document.getElementsByTagName('html')[0];
 
-            done();
-          });
-        });
+          expect(htmlTag.getAttribute('test')).to.equal('helmet-attr');
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('test');
+        }));
 
-        it('overwritten if specified in helmet', (done) => {
-          render(h => (
-            <Helmet>
-              <html test="helmet-attr" />
-            </Helmet>
-          ));
+        it('cleared once it is managed in helmet', () => render(h => (
+          <Helmet>
+            <html test="helmet-attr" />
+          </Helmet>
+        )).then(() => render(h => <Helmet><html test={null} /></Helmet>).then(() => {
+          const htmlTag = document.getElementsByTagName('html')[0];
 
-          requestAnimationFrame(() => {
-            const htmlTag = document.getElementsByTagName('html')[0];
-
-            expect(htmlTag.getAttribute('test')).to.equal('helmet-attr');
-            expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('test');
-
-            done();
-          });
-        });
-
-        it('cleared once it is managed in helmet', (done) => {
-          render(h => (
-            <Helmet>
-              <html test="helmet-attr" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            render(h => <Helmet><html test={null} /></Helmet>);
-
-            requestAnimationFrame(() => {
-              const htmlTag = document.getElementsByTagName('html')[0];
-
-              expect(htmlTag.getAttribute('test')).to.equal(null);
-              expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
-
-              done();
-            });
-          });
-        });
+          expect(htmlTag.getAttribute('test')).to.equal(null);
+          expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        })));
       });
     });
 
@@ -618,163 +461,117 @@ describe('Helmet - Declarative API', () => {
         };
 
         Object.keys(attributeList).forEach((attribute) => {
-          it(attribute, (done) => {
+          it(attribute, () => {
             const attrValue = attributeList[attribute];
 
             const attrs = {
               [attribute]: attrValue,
             };
 
-            render(h => (
+            return render(h => (
               <Helmet>
                 <body {...{ attrs }} />
               </Helmet>
-            ));
-
-            requestAnimationFrame(() => {
+            )).then(() => {
               const bodyTag = document.body;
 
               expect(bodyTag.getAttribute(attribute)).to.equal(attrValue);
               expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(attribute);
-
-              done();
             });
           });
         });
       });
 
-      it('updates multiple body attributes', (done) => {
-        render(h => (
+      it('updates multiple body attributes', () => render(h => (
+        <Helmet>
+          <body class="myClassName" tabindex={-1} />
+        </Helmet>
+      )).then(() => {
+        const bodyTag = document.body;
+
+        expect(bodyTag.getAttribute('class')).to.equal('myClassName');
+        expect(bodyTag.getAttribute('tabindex')).to.equal('-1');
+        expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('class,tabindex');
+      }));
+
+      it('sets attributes based on the deepest nested component', () => render(h => (
+        <div>
           <Helmet>
-            <body class="myClassName" tabindex={-1} />
+            <body lang="en" />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const bodyTag = document.body;
-
-          expect(bodyTag.getAttribute('class')).to.equal('myClassName');
-          expect(bodyTag.getAttribute('tabindex')).to.equal('-1');
-          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('class,tabindex');
-
-          done();
-        });
-      });
-
-      it('sets attributes based on the deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <body lang="en" />
-            </Helmet>
-            <Helmet>
-              <body lang="ja" />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const bodyTag = document.body;
-
-          expect(bodyTag.getAttribute('lang')).to.equal('ja');
-          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('lang');
-
-          done();
-        });
-      });
-
-      it('handles valueless attributes', (done) => {
-        render(h => (
           <Helmet>
-            <body hidden />
+            <body lang="ja" />
           </Helmet>
-        ));
+        </div>
+      )).then(() => {
+        const bodyTag = document.body;
 
-        requestAnimationFrame(() => {
+        expect(bodyTag.getAttribute('lang')).to.equal('ja');
+        expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('lang');
+      }));
+
+      it('handles valueless attributes', () => render(h => (
+        <Helmet>
+          <body hidden />
+        </Helmet>
+      )).then(() => {
+        const bodyTag = document.body;
+
+        expect(bodyTag.getAttribute('hidden')).to.equal('true');
+        expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden');
+      }));
+
+      it('clears body attributes that are handled within helmet', () => render(h => (
+        <Helmet>
+          <body lang="en" hidden />
+        </Helmet>
+      )).then(() => render(h => <Helmet><body lang={null} hidden={null} /></Helmet>).then(() => {
+        const bodyTag = document.body;
+
+        expect(bodyTag.getAttribute('lang')).to.equal(null);
+        expect(bodyTag.getAttribute('hidden')).to.equal(null);
+        expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+      })));
+
+      it('updates with multiple additions and removals - overwrite and new', () => {
+        const data = { updated: false };
+        return render(h => (
+          <Helmet>
+            <body lang="en" hidden />
+            {data.updated && <body lang="ja" id="body-tag" title="body tag" />}
+          </Helmet>
+        )).then(() => {
+          data.updated = true;
+          return rerender();
+        }).then(() => {
           const bodyTag = document.body;
 
           expect(bodyTag.getAttribute('hidden')).to.equal('true');
-          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden');
-
-          done();
+          expect(bodyTag.getAttribute('lang')).to.equal('ja');
+          expect(bodyTag.getAttribute('id')).to.equal('body-tag');
+          expect(bodyTag.getAttribute('title')).to.equal('body tag');
+          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,id,lang,title');
         });
       });
 
-      it('clears body attributes that are handled within helmet', (done) => {
-        render(h => (
+      it('updates with multiple additions and removals - all new', () => {
+        const data = { updated: false };
+        return render(h => (
           <Helmet>
             <body lang="en" hidden />
+            {data.updated && <body id="body-tag" title="body tag" />}
           </Helmet>
-        ));
+        )).then(() => {
+          data.updated = true;
+          return rerender();
+        }).then(() => {
+          const bodyTag = document.body;
 
-        requestAnimationFrame(() => {
-          render(h => <Helmet><body lang={null} hidden={null} /></Helmet>);
-
-          requestAnimationFrame(() => {
-            const bodyTag = document.body;
-
-            expect(bodyTag.getAttribute('lang')).to.equal(null);
-            expect(bodyTag.getAttribute('hidden')).to.equal(null);
-            expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
-
-            done();
-          });
-        });
-      });
-
-      it('updates with multiple additions and removals - overwrite and new', (done) => {
-        render(h => (
-          <Helmet>
-            <body lang="en" hidden />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => (
-            <Helmet>
-              <body lang="ja" id="body-tag" title="body tag" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            const bodyTag = document.body;
-
-            expect(bodyTag.getAttribute('hidden')).to.equal('true');
-            expect(bodyTag.getAttribute('lang')).to.equal('ja');
-            expect(bodyTag.getAttribute('id')).to.equal('body-tag');
-            expect(bodyTag.getAttribute('title')).to.equal('body tag');
-            expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,id,lang,title');
-
-            done();
-          });
-        });
-      });
-
-      it('updates with multiple additions and removals - all new', (done) => {
-        render(h => (
-          <Helmet>
-            <body lang="en" hidden />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => (
-            <Helmet>
-              <body id="body-tag" title="body tag" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            const bodyTag = document.body;
-
-            expect(bodyTag.getAttribute('hidden')).to.equal('true');
-            expect(bodyTag.getAttribute('lang')).to.equal('en');
-            expect(bodyTag.getAttribute('id')).to.equal('body-tag');
-            expect(bodyTag.getAttribute('title')).to.equal('body tag');
-            expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,id,lang,title');
-
-            done();
-          });
+          expect(bodyTag.getAttribute('hidden')).to.equal('true');
+          expect(bodyTag.getAttribute('lang')).to.equal('en');
+          expect(bodyTag.getAttribute('id')).to.equal('body-tag');
+          expect(bodyTag.getAttribute('title')).to.equal('body tag');
+          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('hidden,id,lang,title');
         });
       });
 
@@ -784,63 +581,41 @@ describe('Helmet - Declarative API', () => {
           bodyTag.setAttribute('test', 'test');
         });
 
-        it('attributes are not cleared', (done) => {
-          render(h => <Helmet />);
+        it('attributes are not cleared', () => render(h => <Helmet />).then(() => {
+          const bodyTag = document.body;
 
-          requestAnimationFrame(() => {
-            const bodyTag = document.body;
+          expect(bodyTag.getAttribute('test')).to.equal('test');
+          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        }));
 
-            expect(bodyTag.getAttribute('test')).to.equal('test');
-            expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        it('attributes are overwritten if specified in helmet', () => render(h => (
+          <Helmet>
+            <body test="helmet-attr" />
+          </Helmet>
+        )).then(() => {
+          const bodyTag = document.body;
 
-            done();
-          });
-        });
+          expect(bodyTag.getAttribute('test')).to.equal('helmet-attr');
+          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('test');
+        }));
 
-        it('attributes are overwritten if specified in helmet', (done) => {
-          render(h => (
-            <Helmet>
-              <body test="helmet-attr" />
-            </Helmet>
-          ));
+        it('attributes are cleared once managed in helmet', () => render(h => (
+          <Helmet>
+            <body test="helmet-attr" />
+          </Helmet>
+        )).then(() => render(h => <Helmet><body test={null} /></Helmet>, container).then(() => {
+          const bodyTag = document.body;
 
-          requestAnimationFrame(() => {
-            const bodyTag = document.body;
-
-            expect(bodyTag.getAttribute('test')).to.equal('helmet-attr');
-            expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('test');
-
-            done();
-          });
-        });
-
-        it('attributes are cleared once managed in helmet', (done) => {
-          render(h => (
-            <Helmet>
-              <body test="helmet-attr" />
-            </Helmet>
-          ));
-
-          requestAnimationFrame(() => {
-            render(h => <Helmet><body test={null} /></Helmet>, container);
-
-            requestAnimationFrame(() => {
-              const bodyTag = document.body;
-
-              expect(bodyTag.getAttribute('test')).to.equal(null);
-              expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
-
-              done();
-            });
-          });
-        });
+          expect(bodyTag.getAttribute('test')).to.equal(null);
+          expect(bodyTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
+        })));
       });
     });
 
     describe('handleClientStateChange', () => {
-      it('when handling client state change, calls the function with new state, addedTags and removedTags ', (done) => {
+      it('when handling client state change, calls the function with new state, addedTags and removedTags ', () => {
         const spy = sinon.spy();
-        render(h => (
+        return render(h => (
           <div>
             <Helmet handleClientStateChange={spy}>
               <base href="http://mysite.com/" />
@@ -856,9 +631,7 @@ describe('Helmet - Declarative API', () => {
               <title>Main Title</title>
             </Helmet>
           </div>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(spy.called).to.equal(true);
           const newState = spy.getCall(0).args[0];
           const addedTags = spy.getCall(0).args[1];
@@ -895,14 +668,12 @@ describe('Helmet - Declarative API', () => {
           expect(addedTags.scriptTags[0].outerHTML).to.equal(`<script src="http://localhost/test.js" type="text/javascript" ${HELMET_ATTRIBUTE}="true"></script>`);
 
           expect(Object.keys(removedTags).length).to.equal(0);
-
-          done();
         });
       });
 
-      it('calls the deepest defined callback with the deepest state', (done) => {
+      it('calls the deepest defined callback with the deepest state', () => {
         const spy = sinon.spy();
-        render(h => (
+        return render(h => (
           <div>
             <Helmet handleClientStateChange={spy}>
               <title>Main Title</title>
@@ -911,151 +682,110 @@ describe('Helmet - Declarative API', () => {
               <title>Deeper Title</title>
             </Helmet>
           </div>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(spy.callCount).to.equal(1);
           expect(spy.getCall(0).args[0]).to.contain({
             title: 'Deeper Title',
           });
-
-          done();
         });
       });
     });
 
     describe('base tag', () => {
-      it('updates base tag', (done) => {
-        render(h => (
-          <Helmet>
-            <base href="http://mysite.com/" />
-          </Helmet>
-        ));
+      it('updates base tag', () => render(h => (
+        <Helmet>
+          <base href="http://mysite.com/" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
 
-        requestAnimationFrame(() => {
-          const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
+        expect(existingTags).to.not.equal(undefined);
 
-          expect(existingTags).to.not.equal(undefined);
-
-          const filteredTags = [].slice
-            .call(existingTags)
-            .filter(tag => (
-              tag.getAttribute('href') ===
+        const filteredTags = [].slice
+          .call(existingTags)
+          .filter(tag => (
+            tag.getAttribute('href') ===
                                 'http://mysite.com/'
-            ));
+          ));
 
-          expect(filteredTags.length).to.equal(1);
+        expect(filteredTags.length).to.equal(1);
+      }));
 
-          done();
-        });
-      });
+      it('clears the base tag if one is not specified', () => render(h => (
+        <Helmet base={{ href: 'http://mysite.com/' }} />
+      )).then(() => render(h => <Helmet />).then(() => {
+        const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
 
-      it('clears the base tag if one is not specified', (done) => {
-        render(h => (
-          <Helmet base={{ href: 'http://mysite.com/' }} />
-        ));
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      })));
 
-        requestAnimationFrame(() => {
-          render(h => <Helmet />);
+      it("tags without 'href' are not accepted", () => render(h => (
+        <Helmet>
+          <base property="won't work" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
 
-          requestAnimationFrame(() => {
-            const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(0);
-
-            done();
-          });
-        });
-      });
-
-      it("tags without 'href' are not accepted", (done) => {
-        render(h => (
+      it('sets base tag based on deepest nested component', () => render(h => (
+        <div>
           <Helmet>
-            <base property="won't work" />
+            <base href="http://mysite.com" />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
-
-          expect(existingTags).to.not.equal(undefined);
-          expect(existingTags.length).to.equal(0);
-
-          done();
-        });
-      });
-
-      it('sets base tag based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <base href="http://mysite.com" />
-            </Helmet>
-            <Helmet>
-              <base href="http://mysite.com/public" />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
-          const firstTag = Array.prototype.slice.call(existingTags)[0];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.equal(1);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('href')).to.equal('http://mysite.com/public');
-          expect(firstTag.outerHTML).to.equal(`<base href="http://mysite.com/public" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('does not render tag when primary attribute is null', (done) => {
-        render(h => (
           <Helmet>
-            <base href={undefined} />
+            <base href="http://mysite.com/public" />
           </Helmet>
-        ));
+        </div>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
+        const firstTag = Array.prototype.slice.call(existingTags)[0];
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
+        expect(existingTags).to.not.equal(undefined);
 
-          done();
-        });
-      });
+        expect(existingTags.length).to.be.equal(1);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('href')).to.equal('http://mysite.com/public');
+        expect(firstTag.outerHTML).to.equal(`<base href="http://mysite.com/public" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('does not return render tag when primary attribute is null', () => render(h => (
+        <Helmet>
+          <base href={undefined} />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`base[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
     });
 
     describe('meta tags', () => {
-      it('updates meta tags', (done) => {
-        render(h => (
-          <Helmet>
-            <meta charset="utf-8" />
-            <meta name="description" content="Test description" />
-            <meta http-equiv="content-type" content="text/html" />
-            <meta property="og:type" content="article" />
-            <meta itemprop="name" content="Test name itemprop" />
-          </Helmet>
-        ));
+      it('updates meta tags', () => render(h => (
+        <Helmet>
+          <meta charset="utf-8" />
+          <meta name="description" content="Test description" />
+          <meta http-equiv="content-type" content="text/html" />
+          <meta property="og:type" content="article" />
+          <meta itemprop="name" content="Test name itemprop" />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags).to.not.equal(undefined);
 
-          expect(existingTags).to.not.equal(undefined);
-
-          const filteredTags = [].slice
-            .call(existingTags)
-            .filter(tag => (
-              tag.getAttribute('charset') === 'utf-8' ||
+        const filteredTags = [].slice
+          .call(existingTags)
+          .filter(tag => (
+            tag.getAttribute('charset') === 'utf-8' ||
                                 (tag.getAttribute('name') === 'description' &&
                                     tag.getAttribute('content') ===
                                         'Test description') ||
@@ -1066,688 +796,587 @@ describe('Helmet - Declarative API', () => {
                                 (tag.getAttribute('itemprop') === 'name' &&
                                     tag.getAttribute('content') ===
                                         'Test name itemprop')
-            ));
+          ));
 
-          expect(filteredTags.length).to.be.at.least(4);
+        expect(filteredTags.length).to.be.at.least(4);
+      }));
 
-          done();
-        });
-      });
-
-      it('does not clear meta tags if none are specified', (done) => {
-        render(h => (
+      it('clears meta tags if none are specified', () => {
+        let updated = false;
+        return render(h => (
           <Helmet>
-            <meta name="description" content="Test description" />
+            {!updated && <meta name="description" content="Test description" />}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => <Helmet />, container);
-
-          requestAnimationFrame(() => {
-            const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(1);
-
-            done();
-          });
-        });
-      });
-
-      it("tags without 'name', 'http-equiv', 'property', 'charset', or 'itemprop' are not accepted", (done) => {
-        render(h => (
-          <Helmet>
-            <meta href="won't work" />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
           const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(0);
-
-          done();
         });
       });
 
-      it('sets meta tags based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <meta charset="utf-8" />
-              <meta
-                name="description"
-                content="Test description"
-              />
-            </Helmet>
-            <Helmet>
-              <meta
-                name="description"
-                content="Inner description"
-              />
-              <meta name="keywords" content="test,meta,tags" />
-            </Helmet>
-          </div>
-        ));
+      it("tags without 'name', 'http-equiv', 'property', 'charset', or 'itemprop' are not accepted", () => render(h => (
+        <Helmet>
+          <meta href="won't work" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-          const thirdTag = existingTags[2];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.equal(3);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('charset')).to.equal('utf-8');
-          expect(firstTag.outerHTML).to.equal(`<meta charset="utf-8" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('name')).to.equal('description');
-          expect(secondTag.getAttribute('content')).to.equal('Inner description');
-          expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[2]')
-            .that.is.an.instanceof(Element);
-          expect(thirdTag).to.have.property('getAttribute');
-          expect(thirdTag.getAttribute('name')).to.equal('keywords');
-          expect(thirdTag.getAttribute('content')).to.equal('test,meta,tags');
-          expect(thirdTag.outerHTML).to.equal(`<meta name="keywords" content="test,meta,tags" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('allows duplicate meta tags if specified in the same component', (done) => {
-        render(h => (
+      it('sets meta tags based on deepest nested component', () => render(h => (
+        <div>
           <Helmet>
-            <meta name="description" content="Test description" />
+            <meta charset="utf-8" />
+            <meta
+              name="description"
+              content="Test description"
+            />
+          </Helmet>
+          <Helmet>
+            <meta
+              name="description"
+              content="Inner description"
+            />
+            <meta name="keywords" content="test,meta,tags" />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
+        const thirdTag = existingTags[2];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.be.equal(3);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('charset')).to.equal('utf-8');
+        expect(firstTag.outerHTML).to.equal(`<meta charset="utf-8" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('name')).to.equal('description');
+        expect(secondTag.getAttribute('content')).to.equal('Inner description');
+        expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[2]')
+          .that.is.an.instanceof(Element);
+        expect(thirdTag).to.have.property('getAttribute');
+        expect(thirdTag.getAttribute('name')).to.equal('keywords');
+        expect(thirdTag.getAttribute('content')).to.equal('test,meta,tags');
+        expect(thirdTag.outerHTML).to.equal(`<meta name="keywords" content="test,meta,tags" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('allows duplicate meta tags if specified in the same component', () => render(h => (
+        <Helmet>
+          <meta name="description" content="Test description" />
+          <meta
+            name="description"
+            content="Duplicate description"
+          />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.equal(2);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('name')).to.equal('description');
+        expect(firstTag.getAttribute('content')).to.equal('Test description');
+        expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Test description" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('name')).to.equal('description');
+        expect(secondTag.getAttribute('content')).to.equal('Duplicate description');
+        expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Duplicate description" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('overrides duplicate meta tags with single meta tag in a nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <meta
+              name="description"
+              content="Test description"
+            />
             <meta
               name="description"
               content="Duplicate description"
             />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.equal(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('name')).to.equal('description');
-          expect(firstTag.getAttribute('content')).to.equal('Test description');
-          expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Test description" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('name')).to.equal('description');
-          expect(secondTag.getAttribute('content')).to.equal('Duplicate description');
-          expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Duplicate description" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('overrides duplicate meta tags with single meta tag in a nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <meta
-                name="description"
-                content="Test description"
-              />
-              <meta
-                name="description"
-                content="Duplicate description"
-              />
-            </Helmet>
-            <Helmet>
-              <meta
-                name="description"
-                content="Inner description"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.equal(1);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('name')).to.equal('description');
-          expect(firstTag.getAttribute('content')).to.equal('Inner description');
-          expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('overrides single meta tag with duplicate meta tags in a nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <meta
-                name="description"
-                content="Test description"
-              />
-            </Helmet>
-            <Helmet>
-              <meta
-                name="description"
-                content="Inner description"
-              />
-              <meta
-                name="description"
-                content="Inner duplicate description"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.equal(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('name')).to.equal('description');
-          expect(firstTag.getAttribute('content')).to.equal('Inner description');
-          expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('name')).to.equal('description');
-          expect(secondTag.getAttribute('content')).to.equal('Inner duplicate description');
-          expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Inner duplicate description" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('does not render tag when primary attribute is null', (done) => {
-        render(h => (
           <Helmet>
             <meta
-              name={undefined}
+              name="description"
+              content="Inner description"
+            />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.equal(1);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('name')).to.equal('description');
+        expect(firstTag.getAttribute('content')).to.equal('Inner description');
+        expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('overrides single meta tag with duplicate meta tags in a nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <meta
+              name="description"
+              content="Test description"
+            />
+          </Helmet>
+          <Helmet>
+            <meta
+              name="description"
+              content="Inner description"
+            />
+            <meta
+              name="description"
               content="Inner duplicate description"
             />
           </Helmet>
-        ));
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
+        expect(existingTags).to.not.equal(undefined);
 
-          done();
-        });
-      });
+        expect(existingTags.length).to.equal(2);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('name')).to.equal('description');
+        expect(firstTag.getAttribute('content')).to.equal('Inner description');
+        expect(firstTag.outerHTML).to.equal(`<meta name="description" content="Inner description" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('name')).to.equal('description');
+        expect(secondTag.getAttribute('content')).to.equal('Inner duplicate description');
+        expect(secondTag.outerHTML).to.equal(`<meta name="description" content="Inner duplicate description" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('does not return render tag when primary attribute is null', () => render(h => (
+        <Helmet>
+          <meta
+            name={undefined}
+            content="Inner duplicate description"
+          />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
     });
 
     describe('link tags', () => {
-      it('updates link tags', (done) => {
-        render(h => (
-          <Helmet>
-            <link href="http://localhost/helmet" rel="canonical" />
-            <link
-              href="http://localhost/style.css"
-              rel="stylesheet"
-              type="text/css"
-            />
-          </Helmet>
-        ));
+      it('updates link tags', () => render(h => (
+        <Helmet>
+          <link href="http://localhost/helmet" rel="canonical" />
+          <link
+            href="http://localhost/style.css"
+            rel="stylesheet"
+            type="text/css"
+          />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags).to.not.equal(undefined);
 
-          expect(existingTags).to.not.equal(undefined);
-
-          const filteredTags = [].slice
-            .call(existingTags)
-            .filter(tag => (
-              (tag.getAttribute('href') ===
+        const filteredTags = [].slice
+          .call(existingTags)
+          .filter(tag => (
+            (tag.getAttribute('href') ===
                                     'http://localhost/style.css' &&
                                     tag.getAttribute('rel') === 'stylesheet' &&
                                     tag.getAttribute('type') === 'text/css') ||
                                 (tag.getAttribute('href') ===
                                     'http://localhost/helmet' &&
                                     tag.getAttribute('rel') === 'canonical')
-            ));
+          ));
 
-          expect(filteredTags.length).to.be.at.least(2);
+        expect(filteredTags.length).to.be.at.least(2);
+      }));
 
-          done();
-        });
-      });
-
-      it('does not clear link tags if none are specified', (done) => {
-        render(h => (
+      it('clears link tags if none are specified', () => {
+        let updated = false;
+        return render(h => (
           <Helmet>
-            <link href="http://localhost/helmet" rel="canonical" />
+            {!updated && <link href="http://localhost/helmet" rel="canonical" />}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => <Helmet />, container);
-
-          requestAnimationFrame(() => {
-            const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-            const existingTags = Array.prototype.slice.call(tagNodes);
-
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(1);
-
-            done();
-          });
-        });
-      });
-
-      it("tags without 'href' or 'rel' are not accepted, even if they are valid for other tags", (done) => {
-        render(h => (
-          <Helmet>
-            <link http-equiv="won't work" />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
           const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
           const existingTags = Array.prototype.slice.call(tagNodes);
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(0);
-
-          done();
         });
       });
 
-      it("tags 'rel' and 'href' properly use 'rel' as the primary identification for this tag, regardless of ordering", (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <link
-                href="http://localhost/helmet"
-                rel="canonical"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/new"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                href="http://localhost/helmet/newest"
-                rel="canonical"
-              />
-            </Helmet>
-          </div>
-        ));
+      it("tags without 'href' or 'rel' are not accepted, even if they are valid for other tags", () => render(h => (
+        <Helmet>
+          <link http-equiv="won't work" />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.equal(1);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('rel')).to.equal('canonical');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/newest');
-          expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/helmet/newest" rel="canonical" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it("tags with rel='stylesheet' uses the href as the primary identification of the tag, regardless of ordering", (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <link
-                href="http://localhost/style.css"
-                rel="stylesheet"
-                type="text/css"
-                media="all"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                rel="stylesheet"
-                href="http://localhost/inner.css"
-                type="text/css"
-                media="all"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.equal(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/style.css');
-          expect(firstTag.getAttribute('rel')).to.equal('stylesheet');
-          expect(firstTag.getAttribute('type')).to.equal('text/css');
-          expect(firstTag.getAttribute('media')).to.equal('all');
-          expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/style.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('rel')).to.equal('stylesheet');
-          expect(secondTag.getAttribute('href')).to.equal('http://localhost/inner.css');
-          expect(secondTag.getAttribute('type')).to.equal('text/css');
-          expect(secondTag.getAttribute('media')).to.equal('all');
-          expect(secondTag.outerHTML).to.equal(`<link rel="stylesheet" href="http://localhost/inner.css" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('sets link tags based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet"
-              />
-              <link
-                href="http://localhost/style.css"
-                rel="stylesheet"
-                type="text/css"
-                media="all"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/innercomponent"
-              />
-              <link
-                href="http://localhost/inner.css"
-                rel="stylesheet"
-                type="text/css"
-                media="all"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-          const thirdTag = existingTags[2];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.at.least(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/style.css');
-          expect(firstTag.getAttribute('rel')).to.equal('stylesheet');
-          expect(firstTag.getAttribute('type')).to.equal('text/css');
-          expect(firstTag.getAttribute('media')).to.equal('all');
-          expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/style.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
-          expect(secondTag.getAttribute('rel')).to.equal('canonical');
-          expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[2]')
-            .that.is.an.instanceof(Element);
-          expect(thirdTag).to.have.property('getAttribute');
-          expect(thirdTag.getAttribute('href')).to.equal('http://localhost/inner.css');
-          expect(thirdTag.getAttribute('rel')).to.equal('stylesheet');
-          expect(thirdTag.getAttribute('type')).to.equal('text/css');
-          expect(thirdTag.getAttribute('media')).to.equal('all');
-          expect(thirdTag.outerHTML).to.equal(`<link href="http://localhost/inner.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('allows duplicate link tags if specified in the same component', (done) => {
-        render(h => (
+      it("tags 'rel' and 'href' properly use 'rel' as the primary identification for this tag, regardless of ordering", () => render(h => (
+        <div>
           <Helmet>
-            <link rel="canonical" href="http://localhost/helmet" />
+            <link
+              href="http://localhost/helmet"
+              rel="canonical"
+            />
+          </Helmet>
+          <Helmet>
+            <link
+              rel="canonical"
+              href="http://localhost/helmet/new"
+            />
+          </Helmet>
+          <Helmet>
+            <link
+              href="http://localhost/helmet/newest"
+              rel="canonical"
+            />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.equal(1);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('rel')).to.equal('canonical');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/newest');
+        expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/helmet/newest" rel="canonical" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it("tags with rel='stylesheet' uses the href as the primary identification of the tag, regardless of ordering", () => render(h => (
+        <div>
+          <Helmet>
+            <link
+              href="http://localhost/style.css"
+              rel="stylesheet"
+              type="text/css"
+              media="all"
+            />
+          </Helmet>
+          <Helmet>
+            <link
+              rel="stylesheet"
+              href="http://localhost/inner.css"
+              type="text/css"
+              media="all"
+            />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.equal(2);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/style.css');
+        expect(firstTag.getAttribute('rel')).to.equal('stylesheet');
+        expect(firstTag.getAttribute('type')).to.equal('text/css');
+        expect(firstTag.getAttribute('media')).to.equal('all');
+        expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/style.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('rel')).to.equal('stylesheet');
+        expect(secondTag.getAttribute('href')).to.equal('http://localhost/inner.css');
+        expect(secondTag.getAttribute('type')).to.equal('text/css');
+        expect(secondTag.getAttribute('media')).to.equal('all');
+        expect(secondTag.outerHTML).to.equal(`<link rel="stylesheet" href="http://localhost/inner.css" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('sets link tags based on deepest nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <link
+              rel="canonical"
+              href="http://localhost/helmet"
+            />
+            <link
+              href="http://localhost/style.css"
+              rel="stylesheet"
+              type="text/css"
+              media="all"
+            />
+          </Helmet>
+          <Helmet>
+            <link
+              rel="canonical"
+              href="http://localhost/helmet/innercomponent"
+            />
+            <link
+              href="http://localhost/inner.css"
+              rel="stylesheet"
+              type="text/css"
+              media="all"
+            />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
+        const thirdTag = existingTags[2];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.be.at.least(2);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/style.css');
+        expect(firstTag.getAttribute('rel')).to.equal('stylesheet');
+        expect(firstTag.getAttribute('type')).to.equal('text/css');
+        expect(firstTag.getAttribute('media')).to.equal('all');
+        expect(firstTag.outerHTML).to.equal(`<link href="http://localhost/style.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
+        expect(secondTag.getAttribute('rel')).to.equal('canonical');
+        expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[2]')
+          .that.is.an.instanceof(Element);
+        expect(thirdTag).to.have.property('getAttribute');
+        expect(thirdTag.getAttribute('href')).to.equal('http://localhost/inner.css');
+        expect(thirdTag.getAttribute('rel')).to.equal('stylesheet');
+        expect(thirdTag.getAttribute('type')).to.equal('text/css');
+        expect(thirdTag.getAttribute('media')).to.equal('all');
+        expect(thirdTag.outerHTML).to.equal(`<link href="http://localhost/inner.css" rel="stylesheet" type="text/css" media="all" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('allows duplicate link tags if specified in the same component', () => render(h => (
+        <Helmet>
+          <link rel="canonical" href="http://localhost/helmet" />
+          <link
+            rel="canonical"
+            href="http://localhost/helmet/component"
+          />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.be.at.least(2);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('rel')).to.equal('canonical');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet');
+        expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet" ${HELMET_ATTRIBUTE}="true">`);
+
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('rel')).to.equal('canonical');
+        expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
+        expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('overrides duplicate link tags with a single link tag in a nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <link
+              rel="canonical"
+              href="http://localhost/helmet"
+            />
             <link
               rel="canonical"
               href="http://localhost/helmet/component"
             />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.at.least(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('rel')).to.equal('canonical');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet');
-          expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('rel')).to.equal('canonical');
-          expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
-          expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('overrides duplicate link tags with a single link tag in a nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet"
-              />
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/component"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/innercomponent"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.equal(1);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('rel')).to.equal('canonical');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
-          expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('overrides single link tag with duplicate link tags in a nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet"
-              />
-            </Helmet>
-            <Helmet>
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/component"
-              />
-              <link
-                rel="canonical"
-                href="http://localhost/helmet/innercomponent"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.equal(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('rel')).to.equal('canonical');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
-          expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('rel')).to.equal('canonical');
-          expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
-          expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
-
-          done();
-        });
-      });
-
-      it('does not render tag when primary attribute is null', (done) => {
-        render(h => (
           <Helmet>
-            <link rel="icon" sizes="192x192" href={null} />
+            <link
+              rel="canonical"
+              href="http://localhost/helmet/innercomponent"
+            />
+          </Helmet>
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+
+        expect(existingTags).to.not.equal(undefined);
+
+        expect(existingTags.length).to.be.equal(1);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('rel')).to.equal('canonical');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
+        expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('overrides single link tag with duplicate link tags in a nested component', () => render(h => (
+        <div>
+          <Helmet>
+            <link
+              rel="canonical"
+              href="http://localhost/helmet"
+            />
+          </Helmet>
+          <Helmet>
             <link
               rel="canonical"
               href="http://localhost/helmet/component"
             />
+            <link
+              rel="canonical"
+              href="http://localhost/helmet/innercomponent"
+            />
           </Helmet>
-        ));
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
+        expect(existingTags).to.not.equal(undefined);
 
-          expect(existingTags).to.not.equal(undefined);
-          expect(existingTags.length).to.be.equal(1);
+        expect(existingTags.length).to.be.equal(2);
 
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('rel')).to.equal('canonical');
-          expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
-          expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('rel')).to.equal('canonical');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
+        expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
 
-          done();
-        });
-      });
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('rel')).to.equal('canonical');
+        expect(secondTag.getAttribute('href')).to.equal('http://localhost/helmet/innercomponent');
+        expect(secondTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/innercomponent" ${HELMET_ATTRIBUTE}="true">`);
+      }));
+
+      it('does not return render tag when primary attribute is null', () => render(h => (
+        <Helmet>
+          <link rel="icon" sizes="192x192" href={null} />
+          <link
+            rel="canonical"
+            href="http://localhost/helmet/component"
+          />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`link[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.be.equal(1);
+
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('rel')).to.equal('canonical');
+        expect(firstTag.getAttribute('href')).to.equal('http://localhost/helmet/component');
+        expect(firstTag.outerHTML).to.equal(`<link rel="canonical" href="http://localhost/helmet/component" ${HELMET_ATTRIBUTE}="true">`);
+      }));
     });
 
     describe('script tags', () => {
-      it('updates script tags', (done) => {
+      it('updates script tags', () => {
         const scriptInnerHTML = `
           {
             "@context": "http://schema.org",
@@ -1755,7 +1384,7 @@ describe('Helmet - Declarative API', () => {
             "url": "http://localhost/helmet"
           }
         `;
-        render(h => (
+        return render(h => (
           <Helmet>
             <script
               src="http://localhost/test.js"
@@ -1769,9 +1398,7 @@ describe('Helmet - Declarative API', () => {
               {scriptInnerHTML}
             </script>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           const existingTags = headElement.getElementsByTagName('script');
 
           expect(existingTags).to.not.equal(undefined);
@@ -1793,228 +1420,172 @@ describe('Helmet - Declarative API', () => {
             ));
 
           expect(filteredTags.length).to.be.at.least(3);
-
-          done();
         });
       });
 
-      it('does not clear scripts tags if none are specified', (done) => {
-        render(h => (
+      it('clears scripts tags if none are specified', () => {
+        let updated = false;
+        return render(h => (
+          <Helmet>
+            {!updated && <script
+              src="http://localhost/test.js"
+              type="text/javascript"
+            />}
+          </Helmet>
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
+          const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+
+          expect(existingTags).to.not.equal(undefined);
+          expect(existingTags.length).to.equal(0);
+        });
+      });
+
+      it("tags without 'src' are not accepted", () => render(h => (
+        <Helmet>
+          <script property="won't work" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
+
+      it('sets script tags based on deepest nested component', () => render(h => (
+        <div>
           <Helmet>
             <script
               src="http://localhost/test.js"
               type="text/javascript"
             />
+            <script
+              src="http://localhost/test2.js"
+              type="text/javascript"
+            />
           </Helmet>
-        ));
+        </div>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        const firstTag = existingTags[0];
+        const secondTag = existingTags[1];
 
-        requestAnimationFrame(() => {
-          render(h => <Helmet />, container);
+        expect(existingTags).to.not.equal(undefined);
 
-          requestAnimationFrame(() => {
-            const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+        expect(existingTags.length).to.be.at.least(2);
 
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(1);
+        expect(existingTags).to.have.deep
+          .property('[0]')
+          .that.is.an.instanceof(Element);
+        expect(firstTag).to.have.property('getAttribute');
+        expect(firstTag.getAttribute('src')).to.equal('http://localhost/test.js');
+        expect(firstTag.getAttribute('type')).to.equal('text/javascript');
+        expect(firstTag.outerHTML).to.equal(`<script src="http://localhost/test.js" type="text/javascript" ${HELMET_ATTRIBUTE}="true"></script>`);
 
-            done();
-          });
-        });
-      });
+        expect(existingTags).to.have.deep
+          .property('[1]')
+          .that.is.an.instanceof(Element);
+        expect(secondTag).to.have.property('getAttribute');
+        expect(secondTag.getAttribute('src')).to.equal('http://localhost/test2.js');
+        expect(secondTag.getAttribute('type')).to.equal('text/javascript');
+        expect(secondTag.outerHTML).to.equal(`<script src="http://localhost/test2.js" type="text/javascript" ${HELMET_ATTRIBUTE}="true"></script>`);
+      }));
 
-      it("tags without 'src' are not accepted", (done) => {
-        render(h => (
-          <Helmet>
-            <script property="won't work" />
-          </Helmet>
-        ));
+      it('sets async value correctly', () => render(h => (
+        <Helmet>
+          <script src="foo.js" async />
+        </Helmet>
+      )).then(() => {
+        const existingTag = headElement.querySelector(`script[${HELMET_ATTRIBUTE}]`);
 
-        requestAnimationFrame(() => {
-          const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+        expect(existingTag).to.not.equal(undefined);
+        expect(existingTag.outerHTML).to.be
+          .a('string')
+          .that.equals(`<script src="foo.js" async="true" ${HELMET_ATTRIBUTE}="true"></script>`);
+      }));
 
-          expect(existingTags).to.not.equal(undefined);
-          expect(existingTags.length).to.equal(0);
+      it('does not return render tag when primary attribute (src) is null', () => render(h => (
+        <Helmet>
+          <script src={undefined} type="text/javascript" />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-          done();
-        });
-      });
-
-      it('sets script tags based on deepest nested component', (done) => {
-        render(h => (
-          <div>
-            <Helmet>
-              <script
-                src="http://localhost/test.js"
-                type="text/javascript"
-              />
-              <script
-                src="http://localhost/test2.js"
-                type="text/javascript"
-              />
-            </Helmet>
-          </div>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          const firstTag = existingTags[0];
-          const secondTag = existingTags[1];
-
-          expect(existingTags).to.not.equal(undefined);
-
-          expect(existingTags.length).to.be.at.least(2);
-
-          expect(existingTags).to.have.deep
-            .property('[0]')
-            .that.is.an.instanceof(Element);
-          expect(firstTag).to.have.property('getAttribute');
-          expect(firstTag.getAttribute('src')).to.equal('http://localhost/test.js');
-          expect(firstTag.getAttribute('type')).to.equal('text/javascript');
-          expect(firstTag.outerHTML).to.equal(`<script src="http://localhost/test.js" type="text/javascript" ${HELMET_ATTRIBUTE}="true"></script>`);
-
-          expect(existingTags).to.have.deep
-            .property('[1]')
-            .that.is.an.instanceof(Element);
-          expect(secondTag).to.have.property('getAttribute');
-          expect(secondTag.getAttribute('src')).to.equal('http://localhost/test2.js');
-          expect(secondTag.getAttribute('type')).to.equal('text/javascript');
-          expect(secondTag.outerHTML).to.equal(`<script src="http://localhost/test2.js" type="text/javascript" ${HELMET_ATTRIBUTE}="true"></script>`);
-
-          done();
-        });
-      });
-
-      it('sets async value correctly', (done) => {
-        render(h => (
-          <Helmet>
-            <script src="foo.js" async />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const existingTag = headElement.querySelector(`script[${HELMET_ATTRIBUTE}]`);
-
-          expect(existingTag).to.not.equal(undefined);
-          expect(existingTag.outerHTML).to.be
-            .a('string')
-            .that.equals(`<script src="foo.js" async="true" ${HELMET_ATTRIBUTE}="true"></script>`);
-
-          done();
-        });
-      });
-
-      it('does not render tag when primary attribute (src) is null', (done) => {
-        render(h => (
-          <Helmet>
-            <script src={undefined} type="text/javascript" />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
-
-          done();
-        });
-      });
-
-      it('does not render tag when primary attribute (innerHTML) is null', (done) => {
-        render(h => (
-          <Helmet>
-            <script innerHTML={undefined} />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
-
-          done();
-        });
-      });
+      it('does not return render tag when primary attribute (innerHTML) is null', () => render(h => (
+        <Helmet>
+          <script innerHTML={undefined} />
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
     });
 
     describe('noscript tags', () => {
-      it('updates noscript tags', (done) => {
+      it('updates noscript tags', () => {
         const noscriptInnerHTML = '<link rel="stylesheet" type="text/css" href="foo.css" />';
-        render(h => (
+        return render(h => (
           <Helmet>
             <noscript id="bar">{noscriptInnerHTML}</noscript>
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           const existingTags = headElement.getElementsByTagName('noscript');
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(1);
           expect(existingTags[0].innerHTML === noscriptInnerHTML &&
                             existingTags[0].id === 'bar');
-
-          done();
         });
       });
 
-      it('does not clear noscripts tags if none are specified', (done) => {
-        render(h => (
+      it('clears noscripts tags if none are specified', () => {
+        let updated = false;
+        return render(h => (
           <Helmet>
-            <noscript id="bar" />
+            {!updated && <noscript id="bar" />}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => <Helmet />, container);
-
-          requestAnimationFrame(() => {
-            const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
-
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(0);
-
-            done();
-          });
-        });
-      });
-
-      it("tags without 'innerHTML' are not accepted", (done) => {
-        render(h => (
-          <Helmet>
-            <noscript property="won't work" />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          const existingTags = headElement.querySelectorAll(`noscript[${HELMET_ATTRIBUTE}]`);
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
+          const existingTags = headElement.querySelectorAll(`script[${HELMET_ATTRIBUTE}]`);
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(0);
-
-          done();
         });
       });
 
-      it('does not render tag when primary attribute is null', (done) => {
-        render(h => (
-          <Helmet>
-            <noscript>{undefined}</noscript>
-          </Helmet>
-        ));
+      it("tags without 'innerHTML' are not accepted", () => render(h => (
+        <Helmet>
+          <noscript property="won't work" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`noscript[${HELMET_ATTRIBUTE}]`);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`noscript[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-          done();
-        });
-      });
+      it('does not return render tag when primary attribute is null', () => render(h => (
+        <Helmet>
+          <noscript>{undefined}</noscript>
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`noscript[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
     });
 
     describe('style tags', () => {
-      it('updates style tags', (done) => {
+      it('updates style tags', () => {
         const cssText1 = `
           body {
               background-color: green;
@@ -2026,14 +1597,12 @@ describe('Helmet - Declarative API', () => {
           }
         `;
 
-        render(h => (
+        return render(h => (
           <Helmet>
             <style type="text/css">{cssText1}</style>
             {h('style', { domProps: { innerHTML: cssText2 } })}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           const tagNodes = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
           const existingTags = Array.prototype.slice.call(tagNodes);
 
@@ -2054,69 +1623,51 @@ describe('Helmet - Declarative API', () => {
             .that.is.an.instanceof(Element);
           expect(secondTag.innerHTML).to.equal(cssText2);
           expect(secondTag.outerHTML).to.equal(`<style ${HELMET_ATTRIBUTE}="true">${cssText2}</style>`);
-
-          done();
         });
       });
 
-      it('does not clear style tags if none are specified', (done) => {
+      it('clears style tags if none are specified', () => {
         const cssText = `
           body {
               background-color: green;
           }
         `;
-        render(h => (
+        let updated = false;
+        return render(h => (
           <Helmet>
-            <style type="text/css">{cssText}</style>
+            {!updated && <style type="text/css">{cssText}</style>}
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          render(h => <Helmet />, container);
-
-          requestAnimationFrame(() => {
-            const existingTags = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
-
-            expect(existingTags).to.not.equal(undefined);
-            expect(existingTags.length).to.equal(1);
-
-            done();
-          });
-        });
-      });
-
-      it("tags without 'cssText' are not accepted", (done) => {
-        render(h => (
-          <Helmet>
-            <style property="won't work" />
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
           const existingTags = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(0);
-
-          done();
         });
       });
 
-      it('does not render tag when primary attribute is null', (done) => {
-        render(h => (
-          <Helmet>
-            <style>{undefined}</style>
-          </Helmet>
-        ));
+      it("tags without 'cssText' are not accepted", () => render(h => (
+        <Helmet>
+          <style property="won't work" />
+        </Helmet>
+      )).then(() => {
+        const existingTags = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
 
-        requestAnimationFrame(() => {
-          const tagNodes = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
-          const existingTags = Array.prototype.slice.call(tagNodes);
-          expect(existingTags.length).to.equal(0);
+        expect(existingTags).to.not.equal(undefined);
+        expect(existingTags.length).to.equal(0);
+      }));
 
-          done();
-        });
-      });
+      it('does not return render tag when primary attribute is null', () => render(h => (
+        <Helmet>
+          <style>{undefined}</style>
+        </Helmet>
+      )).then(() => {
+        const tagNodes = headElement.querySelectorAll(`style[${HELMET_ATTRIBUTE}]`);
+        const existingTags = Array.prototype.slice.call(tagNodes);
+        expect(existingTags.length).to.equal(0);
+      }));
     });
   });
 
@@ -2129,8 +1680,8 @@ describe('Helmet - Declarative API', () => {
       delete window.spy;
     });
 
-    it('executes asynchronously', (done) => {
-      render(h => (
+    it('executes asynchronously', () => {
+      const promise = render(h => (
         <div>
           <Helmet>
             <script>
@@ -2142,121 +1693,84 @@ describe('Helmet - Declarative API', () => {
 
       expect(window.spy.callCount).to.equal(0);
 
-      requestAnimationFrame(() => {
+      return promise.then(() => {
         expect(window.spy.callCount).to.equal(1);
         expect(window.spy.args).to.deep.equal([[1]]);
-        done();
       });
     });
   });
 
   describe('misc', () => {
-    it('throws in rewind() when a DOM is present', () => {
-      render(h => (
-        <Helmet>
-          <title>Fancy title</title>
-        </Helmet>
-      ));
-      expect(helmetContext.rewind).to.throw('You may only call rewind() on the server. Call peek() to read the current state.');
-    });
+    it('lets you read current state via context.state', () => render(h => (
+      <Helmet>
+        <title>Fancy title</title>
+      </Helmet>
+    )).then(() => {
+      expect(staticContext.state.title).to.be.equal('Fancy title');
+    }));
 
-    it('lets you read current state in peek() when DOM is present', (done) => {
-      render(h => (
-        <Helmet>
-          <title>Fancy title</title>
-        </Helmet>
-      ));
-      requestAnimationFrame(() => {
-        expect(helmetContext.peek().title).to.be.equal('Fancy title');
-        done();
-      });
-    });
+    it('encodes special characters', () => render(h => (
+      <Helmet>
+        <meta
+          name="description"
+          content={'This is "quoted" text and & and \'.'}
+        />
+      </Helmet>
+    )).then(() => {
+      const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+      const existingTag = existingTags[0];
 
-    it('encodes special characters', (done) => {
-      render(h => (
-        <Helmet>
-          <meta
-            name="description"
-            content={'This is "quoted" text and & and \'.'}
-          />
-        </Helmet>
-      ));
+      expect(existingTags).to.not.equal(undefined);
 
-      requestAnimationFrame(() => {
-        const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-        const existingTag = existingTags[0];
+      expect(existingTags.length).to.be.equal(1);
 
-        expect(existingTags).to.not.equal(undefined);
+      expect(existingTags).to.have.deep
+        .property('[0]')
+        .that.is.an.instanceof(Element);
+      expect(existingTag).to.have.property('getAttribute');
+      expect(existingTag.getAttribute('name')).to.equal('description');
+      expect(existingTag.getAttribute('content')).to.equal('This is "quoted" text and & and \'.');
+      expect(existingTag.outerHTML).to.equal(`<meta name="description" content="This is &quot;quoted&quot; text and &amp; and '." ${HELMET_ATTRIBUTE}="true">`);
+    }));
 
-        expect(existingTags.length).to.be.equal(1);
-
-        expect(existingTags).to.have.deep
-          .property('[0]')
-          .that.is.an.instanceof(Element);
-        expect(existingTag).to.have.property('getAttribute');
-        expect(existingTag.getAttribute('name')).to.equal('description');
-        expect(existingTag.getAttribute('content')).to.equal('This is "quoted" text and & and \'.');
-        expect(existingTag.outerHTML).to.equal(`<meta name="description" content="This is &quot;quoted&quot; text and &amp; and '." ${HELMET_ATTRIBUTE}="true">`);
-
-        done();
-      });
-    });
-
-    xit('does not change the DOM if it recevies identical props', (done) => {
+    xit('does not change the DOM if it recevies identical props', () => {
       const spy = sinon.spy();
-      render(h => (
+      return render(h => (
         <Helmet handleClientStateChange={spy}>
           <meta name="description" content="Test description" />
           <title>Test Title</title>
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
-        // Re-rendering will pass new props to an already mounted Helmet
-        render(h => (
-          <Helmet handleClientStateChange={spy}>
-            <meta name="description" content="Test description" />
-            <title>Test Title</title>
-          </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
-          expect(spy.callCount).to.equal(1);
-          done();
-        });
+      )).then(() => rerender()).then(() => {
+        expect(spy.callCount).to.equal(1);
       });
     });
 
-    xit('does not write the DOM if the client and server are identical', (done) => {
+    xit('does not write the DOM if the client and server are identical', () => {
       headElement.innerHTML = `<script ${HELMET_ATTRIBUTE}="true" src="http://localhost/test.js" type="text/javascript" />`;
 
       const spy = sinon.spy();
-      render(h => (
+      return render(h => (
         <Helmet handleClientStateChange={spy}>
           <script
             src="http://localhost/test.js"
             type="text/javascript"
           />
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(spy.called).to.equal(true);
 
         const [, addedTags, removedTags] = spy.getCall(0).args;
 
         expect(addedTags.length).to.equal(0);
         expect(removedTags.length).to.equal(0);
-
-        done();
       });
     });
 
-    it('only adds new tags and preserves tags when rendering additional Helmet instances', (done) => {
+    it('only adds new tags and preserves tags when return rendering additional Helmet instances', () => {
       const spy = sinon.spy();
       let addedTags;
       let removedTags;
-      render(h => (
+      return render(h => (
         <Helmet handleClientStateChange={spy}>
           <link
             href="http://localhost/style.css"
@@ -2265,9 +1779,7 @@ describe('Helmet - Declarative API', () => {
           />
           <meta name="description" content="Test description" />
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(spy.called).to.equal(true);
         ([, addedTags, removedTags] = spy.getCall(0).args);
 
@@ -2279,8 +1791,8 @@ describe('Helmet - Declarative API', () => {
         expect(addedTags.linkTags[0].outerHTML).to.equal(`<link href="http://localhost/style.css" rel="stylesheet" type="text/css" ${HELMET_ATTRIBUTE}="true">`);
         expect(Object.keys(removedTags).length).to.equal(0);
 
-        // Re-rendering will pass new props to an already mounted Helmet
-        render(h => (
+        // Re-return rendering will pass new props to an already mounted Helmet
+        return render(h => (
           <Helmet handleClientStateChange={spy}>
             <link
               href="http://localhost/style.css"
@@ -2294,9 +1806,7 @@ describe('Helmet - Declarative API', () => {
             />
             <meta name="description" content="New description" />
           </Helmet>
-        ));
-
-        requestAnimationFrame(() => {
+        )).then(() => {
           expect(spy.callCount).to.equal(2);
           ([, addedTags, removedTags] = spy.getCall(1).args);
 
@@ -2310,25 +1820,21 @@ describe('Helmet - Declarative API', () => {
           expect(removedTags.metaTags).to.have.deep.property('[0]');
           expect(removedTags.metaTags[0].outerHTML).to.equal(`<meta name="description" content="Test description" ${HELMET_ATTRIBUTE}="true">`);
           expect(removedTags).to.not.have.property('linkTags');
-
-          done();
         });
       });
     });
 
-    it('does not accept nested Helmets', (done) => {
+    it('does not accept nested Helmets', () => {
       const warn = sinon.stub(console, 'warn');
 
-      render(h => (
+      return render(h => (
         <Helmet>
           <title>Test Title</title>
           <Helmet>
             <title>Title you will never see</title>
           </Helmet>
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(document.title).to.equal('Test Title');
         expect(warn.called).to.equal(true);
 
@@ -2336,24 +1842,20 @@ describe('Helmet - Declarative API', () => {
         expect(!!warning).to.equal(true);
 
         warn.restore();
-
-        done();
       });
     });
 
-    it('warns on invalid elements', (done) => {
+    it('warns on invalid elements', () => {
       const warn = sinon.stub(console, 'warn');
 
-      render(h => (
+      return render(h => (
         <Helmet>
           <title>Test Title</title>
           <div>
             <title>Title you will never see</title>
           </div>
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(document.title).to.equal('Test Title');
         expect(warn.called).to.equal(true);
 
@@ -2361,21 +1863,18 @@ describe('Helmet - Declarative API', () => {
         expect(warning).to.equal('Only elements types base, body, html, link, meta, noscript, script, style, title are allowed. Helmet does not support rendering <div> elements. Refer to our API for more information.');
 
         warn.restore();
-        done();
       });
     });
 
-    it('warns on invalid self-closing elements', (done) => {
+    it('warns on invalid self-closing elements', () => {
       const warn = sinon.stub(console, 'warn');
 
-      render(h => (
+      return render(h => (
         <Helmet>
           <title>Test Title</title>
           <div customAttribute />
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(document.title).to.equal('Test Title');
         expect(warn.called).to.equal(true);
 
@@ -2383,13 +1882,13 @@ describe('Helmet - Declarative API', () => {
         expect(warning).to.equal('Only elements types base, body, html, link, meta, noscript, script, style, title are allowed. Helmet does not support rendering <div> elements. Refer to our API for more information.');
 
         warn.restore();
-        done();
       });
     });
 
-    xit('throws on invalid strings as children', () => {
-      const renderInvalid = () =>
-        render(h => (
+    it('throws on invalid strings as children', () => {
+      const spy = sinon.spy(() => false);
+      return render(
+        h => (
           <Helmet>
             <title>Test Title</title>
             <link // eslint-disable-line react/void-dom-elements-no-children
@@ -2398,74 +1897,68 @@ describe('Helmet - Declarative API', () => {
             >test
             </link>
           </Helmet>
-        ));
-
-      // not sure how to detect error as Vue swallows the error in the render function :?
-      expect(renderInvalid).to.throw(
-        Error,
-        '<link /> elements are self-closing and can not contain children. Refer to our API for more information.',
-      );
+        ),
+        spy,
+      ).then(() => {
+        assert(spy.calledOnce, 'error handler called');
+        const [err] = spy.firstCall.args;
+        assert(err instanceof Error, 'Error thrown');
+        assert(err.message === '<link /> elements are self-closing and can not contain children. Refer to our API for more information.', 'correct message');
+      });
     });
 
-    xit('throws on invalid children', () => {
-      const renderInvalid = () =>
-        render(h => (
+    it('throws on invalid children', () => {
+      const spy = sinon.spy(() => false);
+      return render(
+        h => (
           <Helmet>
             <title>Test Title</title>
             <script>
               <title>Title you will never see</title>
             </script>
           </Helmet>
-        ));
-
-      // not sure how to detect error as Vue swallows the error in the render function :?
-      expect(renderInvalid).to.throw(
-        Error,
-        'Helmet expects a string as a child of <script>. Did you forget to wrap your children in braces? ( <script>{``}</script> ) Refer to our API for more information.',
-      );
+        ),
+        spy,
+      ).then(() => {
+        assert(spy.calledOnce, 'error handler called');
+        const [err] = spy.firstCall.args;
+        assert(err instanceof Error, 'Error thrown');
+        assert(err.message === 'Helmet expects a string as the default slot of <script>. Did you forget to wrap the slot in braces? ( <script>{``}</script> ) Refer to our API for more information.', err.message);
+      });
     });
 
-    it('handles undefined children', (done) => {
+    it('handles undefined children', () => {
       const charSet = undefined;
 
-      render(h => (
+      return render(h => (
         <Helmet>
           {charSet && <meta charSet={charSet} />}
           <title>Test Title</title>
         </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
+      )).then(() => {
         expect(document.title).to.equal('Test Title');
-        done();
       });
     });
 
-    it('recognizes valid tags regardless of attribute ordering', (done) => {
-      render(h => (
-        <Helmet>
-          <meta content="Test Description" name="description" />
-        </Helmet>
-      ));
+    it('recognizes valid tags regardless of attribute ordering', () => render(h => (
+      <Helmet>
+        <meta content="Test Description" name="description" />
+      </Helmet>
+    )).then(() => {
+      const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
+      const existingTag = existingTags[0];
 
-      requestAnimationFrame(() => {
-        const existingTags = headElement.querySelectorAll(`meta[${HELMET_ATTRIBUTE}]`);
-        const existingTag = existingTags[0];
+      expect(existingTags).to.not.equal(undefined);
 
-        expect(existingTags).to.not.equal(undefined);
+      expect(existingTags.length).to.be.equal(1);
 
-        expect(existingTags.length).to.be.equal(1);
-
-        expect(existingTags).to.have.deep
-          .property('[0]')
-          .that.is.an.instanceof(Element);
-        expect(existingTag).to.have.property('getAttribute');
-        expect(existingTag.getAttribute('name')).to.equal('description');
-        expect(existingTag.getAttribute('content')).to.equal('Test Description');
-        expect(existingTag.outerHTML).to.equal(`<meta content="Test Description" name="description" ${HELMET_ATTRIBUTE}="true">`);
-
-        done();
-      });
-    });
+      expect(existingTags).to.have.deep
+        .property('[0]')
+        .that.is.an.instanceof(Element);
+      expect(existingTag).to.have.property('getAttribute');
+      expect(existingTag.getAttribute('name')).to.equal('description');
+      expect(existingTag.getAttribute('content')).to.equal('Test Description');
+      expect(existingTag.outerHTML).to.equal(`<meta content="Test Description" name="description" ${HELMET_ATTRIBUTE}="true">`);
+    }));
   });
 });

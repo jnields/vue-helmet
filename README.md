@@ -3,106 +3,103 @@
 [![Coverage Status](https://coveralls.io/repos/github/jnields/vue-helmet/badge.svg?branch=master)](https://coveralls.io/github/jnields/vue-helmet?branch=master)
 [![Build Status](https://travis-ci.org/jnields/vue-helmet.svg?branch=master)](https://travis-ci.org/jnields/vue-helmet)
 
-Vue-based solution inspired by [react-helmet](https://github.com/nfl/react-helmet).
+Vue-based head manage solution inspired by [react-helmet](https://github.com/nfl/react-helmet).
 
 ## Install
+
+This package requires a `Promise` polyfill to be provided in environments that don't support them natively, and `vue@^2.2.1`
 
 ```
 npm i -S @jnields/vue-helmet
 ```
 
-## Differences from [react-helmet](https://github.com/nfl/react-helmet)
-
-### 1) Requires context to be provided via a `<HelmetProvider />`
-
-A `<HelmetProvider />` component must be rendered as an ancestor to any helmet instances and provided a context prop. `context.rewind()` is available on the server in lieu of `Helmet.renderStatic()` or `Helmet.rewind()` (see usage)
-
-> WHY? React’s server-side rendering is synchronous, which allows tracking of rendered component instances per `renderToString` call at the class level. Because Vue’s server-side rendering is _asynchronous_, several `renderToString` calls may interact with a class-level identifier at the same time, which makes it necessary to track components with something unique to each `renderToString` call.
-
-### 2) Child `<Helmet/>`s will not clear parent `<Helmet/>`s’ tags
-
-Rendering a [react-helmet](https://github.com/nfl/react-helmet) without any link tags will clear link tags if a parent component had rendered them. This is not the case for this package. Instead, this package will override tags based on their primary attribute (e.g. rel for link tags).
-
-### 3) Child `<Helmet/>`s will not clear any html, title, or body attributes defined by parent `<Helmet/>`s by default
-
-However, Explicitly setting an attribute to `null` will clear it.
-
-### 4) Only offers rendering to string on the server
-
-[react-helmet](https://github.com/nfl/react-helmet) offers both `toComponent()` and `toString()` methods on the server. This package does not offer a method but rather provides the rendered tags as a string property on the result of `context.rewind()`. (see usage)
-
-### 5) Only the declarative API is supported
-
-You may use the props `defaultTitle`, `titleTemplate`, and `handleClientStateChange` on the `<Helmet/>` instance. No other props are supported. You must instead use the declarative API (i.e. by rendering tags within a `<Helmet />`).
-
-## Usage
-
-```js
-// app.js
-import Vue from 'vue';
-import { Helmet, HelmetContext, HelmetProvider } from '@jnields/vue-helmet';
-
-export default Vue.extend({
-  name: 'app',
-  props: {
-    context: {
-      type: HelmetContext,
-      required: true,
-    },
-    handleClientStateChange: Function,
-  },
-  render() {
-    return (
-      <HelmetProvider context={this.$props.context}>
+## example
+```vue
+<template>
+    <helmet-provider>
         <div>
-          <h1>Example App</h1>
-          <Helmet
-            titleTemplate="REI - %s"
-            defaultTitle="Outdoor Clothing, Gear and Footwear from Top Brands"
-            handleClientStateChange={this.handleClientStateChange}
-          >
-            <html lang="en" />
-            <title lang="en">My Title</title>
-            <meta charset="utf-8" />
-            <link rel="canonical" href="http://mysite.com/example" />
-            <body class="noscroll" />
-            <noscript>{`<style>.jsonly{display:none}</style>`}</noscript>
-            <script src="/utag.js" async />
-           </Helmet>
+            <helmet>
+                <meta charSet="utf-8" />
+                <title>My Title</title>
+                <link rel="canonical" href="http://mysite.com/example" />
+            </helmet>
         </div>
-      </HelmetProvider>
-    );
-  }
-});
+    </helmet-provider>
+</template>
+<script>
+import { Helmet } from "@jnields/vue-helmet";
+
+export default {
+  name: 'app',
+  components: { HelmetProvider, Helmet },
+};
+</script>
 ```
 
-```js
-// browser
-import Vue from 'vue';
-import { HelmetContext } from '@jnields/vue-helmet';
+Nested or latter components will override duplicate changes:
 
-const context = new HelmetContext();
-new App({ propsData: { context } }).$mount(document.getElementById('root'));
+```vue
+<template>
+    <Parent>
+        <Helmet>
+            <title>My Title</title>
+            <meta name="description" content="Helmet application" />
+        </Helmet>
+
+        <Child>
+            <Helmet>
+                <title>Nested Title</title>
+                <meta name="description" content="Nested component" />
+            </Helmet>
+        </Child>
+    </Parent>
+</template>
 ```
+
+outputs:
+
+```html
+<head>
+    <title>Nested Title</title>
+    <meta name="description" content="Nested component">
+</head>
+```
+
+See below for a full reference guide.
+
+## Features
+- Supports all valid head tags: `title`, `base`, `meta`, `link`, `script`, `noscript`, and `style` tags.
+- Supports attributes for `body`, `html` and `title` tags.
+- Supports server-side rendering.
+- Nested components override duplicate head changes.
+- Duplicate head changes are preserved when specified in the same component (support for tags like "apple-touch-icon").
+- Callback for tracking DOM changes.
+
+## Server usage
+
+`HelmetProvider` takes an optional `context` prop, of type `Object`, that writes to state.
+You can access rendered tags on the server via `context.state.link`, etc.
+
+Assuming `App` passes its context prop along to HelmetProvider (as above), your server would look like this:
 
 ```js
 // server
 import { createRenderer } from 'vue-server-renderer';
-import { HelmetContext } from '@jnields/vue-helmet';
 
 const renderer = createRenderer();
 
 app.use(async (req, res, next) => {
   try {
-    const context = new HelmetContext();
+    const context = {};
     const markup = await renderer.renderToString(new App({
       propsData: { context }
     }));
-    const helmet = context.rewind();
+    const helmet = context.state;
     const html = `
       <!doctype html>
       <html ${helmet.htmlAttributes}>
         <head>
+          ${helmet.base}
           ${helmet.link}
           ${helmet.meta}
           ${helmet.noscript}
@@ -117,10 +114,84 @@ app.use(async (req, res, next) => {
         </body>
       </html>
     `;
-    res.end(html);    
+    res.end(html);
   } catch (e) {
     next(e);
   }
 });
+```
 
+### Reference Guide
+
+```vue
+<helmet
+    {/*
+        (optional) used as a fallback when a template exists but a title is not defined
+
+        <helmet
+            defaultTitle="My Site"
+            titleTemplate="My Site - %s"
+        />
+
+        outputs:
+
+        <head>
+            <title>My Site</title>
+        </head>
+    */}
+    defaultTitle="My Default Title"
+
+    {/* (optional) callback that tracks DOM changes */}
+    onChangeClientState={(newState, addedTags, removedTags) => console.log(newState, addedTags, removedTags)}
+>
+    {/* html attributes */}
+    <html lang="en" amp />
+
+    {/* body attributes */}
+    <body className="root" />
+
+    {/* title attributes and value */}
+    <title itemProp="name" lang="en">My Plain Title or {`dynamic`} title</title>
+
+    {/* base element */}
+    <base target="_blank" href="http://mysite.com/" />
+
+    {/* multiple meta elements */}
+    <meta name="description" content="Helmet application" />
+    <meta property="og:type" content="article" />
+
+    {/* multiple link elements */}
+    <link rel="canonical" href="http://mysite.com/example" />
+    <link rel="apple-touch-icon" href="http://mysite.com/img/apple-touch-icon-57x57.png" />
+    <link rel="apple-touch-icon" sizes="72x72" href="http://mysite.com/img/apple-touch-icon-72x72.png" />
+    {locales.map((locale) => {
+        <link rel="alternate" href="http://example.com/{locale}" hrefLang={locale} />
+    })}
+
+    {/* multiple script elements */}
+    <script src="http://include.com/pathtojs.js" type="text/javascript" />
+
+    {/* inline script elements */}
+    <script type="application/ld+json">{
+      JSON.stringify({
+        "@context": "http://schema.org"
+      })
+    }</script>
+
+    {/* noscript elements */}
+    <noscript>{`
+        <link rel="stylesheet" type="text/css" href="foo.css" />
+    `}</noscript>
+
+    {/* inline style elements */}
+    <style type="text/css">{`
+        body {
+            background-color: blue;
+        }
+
+        p {
+            font-size: 12px;
+        }
+    `}</style>
+</helmet>
 ```

@@ -6,10 +6,11 @@
 import Vue from 'vue';
 import { createRenderer } from 'vue-server-renderer';
 
-import requestAnimationFrame from 'raf';
 import { expect } from 'chai';
-import { Helmet, HelmetContext, HelmetProvider } from '../src/index';
+import { Helmet, HelmetProvider } from '../src/index';
 import { HELMET_ATTRIBUTE } from '../src/HelmetConstants';
+
+Vue.config.productionTip = false;
 
 // const serverRendered = 'data-server-rendered="true"';
 const stringifiedHtmlAttributes = 'class="myClassName" lang="ga"';
@@ -51,18 +52,18 @@ const stringifiedStyleTags = [
 
 describe('server', () => {
   const renderer = createRenderer();
-  let helmetContext;
+  let staticContext;
   let vm;
 
   beforeEach(() => {
-    helmetContext = new HelmetContext();
+    staticContext = {};
   });
 
   function render(renderFunction) {
     const Component = Vue.extend({
       render(h) {
         return (
-          <HelmetProvider context={helmetContext}>
+          <HelmetProvider context={staticContext}>
             {h({ render: renderFunction })}
           </HelmetProvider>
         );
@@ -72,27 +73,13 @@ describe('server', () => {
     return renderer.renderToString(vm);
   }
 
-  afterEach(() => {
-    helmetContext.rewind();
-  });
-
-  before(() => {
-    HelmetContext.canUseDOM = false;
-  });
-
-  it('provides initial values if no state is found', () => {
-    let head = helmetContext.rewind();
-    head = helmetContext.rewind();
-    expect(head.meta).to.equal('');
-  });
-
   it('encodes special characters in title', async () => {
     await render(h => (
       <Helmet>
         <title>{'Dangerous <script> include'}</title>
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.title).to.equal(stringifiedTitle);
   });
 
@@ -103,7 +90,7 @@ describe('server', () => {
         <title>{rawTitle}</title>
       </Helmet>
     ));
-    const head = Helmet.rewind();
+    const head = staticContext.state;
     expect(head.title).to.equal(unEncodedStringifiedTitle);
   });
 
@@ -113,7 +100,7 @@ describe('server', () => {
         <title itemprop="name">Title with Itemprop</title>
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.title).to.be
       .a('string')
       .that.equals(stringifiedTitleWithItemprop);
@@ -125,7 +112,7 @@ describe('server', () => {
         <base target="_blank" href="http://localhost/" />
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.base).to.be
       .a('string')
       .that.equals(stringifiedBaseTag);
@@ -144,7 +131,7 @@ describe('server', () => {
         <meta itemprop="name" content="Test name itemprop" />
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.meta).to.be
       .a('string')
       .that.equals(stringifiedMetaTags);
@@ -162,7 +149,7 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.link).to.be
       .a('string')
       .that.equals(stringifiedLinkTags);
@@ -182,7 +169,7 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.script).to.be
       .a('string')
       .that.equals(stringifiedScriptTags);
@@ -196,7 +183,7 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.noscript).to.be
       .a('string')
       .that.equals(stringifiedNoscriptTags);
@@ -209,7 +196,7 @@ describe('server', () => {
         <style type="text/css">{'p {font-size: 12px;}'}</style>
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.style).to.be
       .a('string')
       .that.equals(stringifiedStyleTags);
@@ -221,7 +208,7 @@ describe('server', () => {
         <title>{'Dangerous <script> include'}</title>
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.title).to.be
       .a('string')
       .that.equals(stringifiedTitle);
@@ -236,7 +223,7 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
 
     expect(head.title).to.be
       .a('string')
@@ -249,7 +236,7 @@ describe('server', () => {
         <title itemprop="name">Title with Itemprop</title>
       </Helmet>
     ));
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
     expect(head.title).to.be
       .a('string')
       .that.equals(stringifiedTitleWithItemprop);
@@ -262,7 +249,7 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const { htmlAttributes } = helmetContext.rewind();
+    const { htmlAttributes } = staticContext.state;
     expect(htmlAttributes).to.be
       .a('string')
       .that.equals(stringifiedHtmlAttributes);
@@ -282,7 +269,7 @@ describe('server', () => {
         <body lang="ga" class="myClassName" />
       </Helmet>
     ));
-    const { bodyAttributes } = helmetContext.rewind();
+    const { bodyAttributes } = staticContext.state;
     expect(bodyAttributes).to.be
       .a('string')
       .that.equals(stringifiedBodyAttributes);
@@ -300,17 +287,17 @@ describe('server', () => {
       </div>
     ));
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
 
     expect(head.title).to.be
       .a('string')
       .that.equals(stringifiedChineseTitle);
   });
 
-  it('rewind() provides a fallback object for empty Helmet state', async () => {
+  it('provides a fallback object for empty Helmet state', async () => {
     await render(h => <div />);
 
-    const head = helmetContext.rewind();
+    const head = staticContext.state;
 
     expect(head.htmlAttributes).to.equal('');
     expect(head.title).to.equal(`<title ${HELMET_ATTRIBUTE}="true"></title>`);
@@ -329,24 +316,9 @@ describe('server', () => {
       </Helmet>
     ));
 
-    const { script } = helmetContext.rewind();
+    const { script } = staticContext.state;
     expect(script).to.be
       .a('string')
       .that.equals(`<script ${HELMET_ATTRIBUTE}="true" src="foo.js" async></script>`);
-  });
-
-  describe('misc', () => {
-    it('lets you read current state in peek() whether or not a DOM is present', (done) => {
-      render(h => (
-        <Helmet>
-          <title>Fancy title</title>
-        </Helmet>
-      ));
-
-      requestAnimationFrame(() => {
-        expect(helmetContext.peek().title).to.be.equal('Fancy title');
-        done();
-      });
-    });
   });
 });

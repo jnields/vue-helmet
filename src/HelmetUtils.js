@@ -1,5 +1,4 @@
 // @flow
-import raf from 'raf';
 import toStyle from 'to-style';
 import cs from 'classnames';
 import escapeHtml from 'escape-html';
@@ -307,19 +306,7 @@ function convertVNodeDataToMap(data: VNodeDataType, initAttributes?: VNodeDataTy
   };
 }
 
-const handleClientStateChange = (() => {
-  let animationFrame = null;
-  return (newState: ClientStateType): void => {
-    if (animationFrame) {
-      raf.cancel(animationFrame);
-    }
-    animationFrame = raf(() => {
-      commitTagChanges(newState, () => {
-        animationFrame = null;
-      });
-    });
-  };
-})();
+const handleClientStateChange = commitTagChanges;
 
 const mapStateOnServer = ({
   baseTag,
