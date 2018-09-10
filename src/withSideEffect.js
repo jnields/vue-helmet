@@ -124,9 +124,9 @@ export default (
             listeners: this.$on,
             scopedSlots: this.$scopedSlots,
           },
-          Object.entries(this.$slots).map(([slot, vnode]) => ({
-            slot,
-            render: () => h(NullComponent, vnode),
+          Object.keys(this.$slots).map(slot => ({
+            slot: this.$slots[slot],
+            render: () => h(NullComponent, this.$slots[slot]),
           })),
         );
       },

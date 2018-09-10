@@ -2,7 +2,7 @@
 /* eslint-env browser */
 /* eslint max-nested-callbacks: [1, 7] */
 /* eslint-disable jsx-a11y/html-has-lang */
-import Promise from '@babel/runtime/core-js/promise';
+import 'es6-promise/auto';
 import Vue from 'vue';
 import sinon from 'sinon';
 import { assert, expect } from 'chai';
@@ -11,16 +11,13 @@ import { HELMET_ATTRIBUTE } from '../src/HelmetConstants';
 
 Vue.config.productionTip = false;
 
-window.Promise = Promise; // needed for PhantomJS
-
 describe('Helmet - Declarative API', () => {
   let headElement;
   const container = document.createElement('div');
   let vm;
   let staticContext;
   beforeEach(() => {
-    headElement =
-      headElement || document.head || document.querySelector('head');
+    headElement = headElement || document.head || document.querySelector('head');
     // resets DOM after each run
     headElement.innerHTML = '';
   });
@@ -73,7 +70,9 @@ describe('Helmet - Declarative API', () => {
 
         return render(h => (
           <Helmet>
-            <title>Title: {someValue}</title>
+            <title>
+              {`Title: ${someValue}`}
+            </title>
           </Helmet>
         )).then(() => {
           expect(document.title).to.equal('Title: Some Great Title');
@@ -346,19 +345,23 @@ describe('Helmet - Declarative API', () => {
         expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal('amp');
       }));
 
-      it('clears html attributes that are handled within helmet', () => render(h => (
-        <Helmet>
-          <html lang="en" amp />
-        </Helmet>
-      )).then(() =>
-      // eslint-disable-next-line jsx-a11y/lang
-        render(h => <Helmet><html lang={null} amp={null} /></Helmet>, container).then(() => {
+      it('clears html attributes that are handled within helmet', () => {
+        let updated = false;
+        return render(h => (
+          <Helmet>
+            {!updated && <html lang="en" amp />}
+          </Helmet>
+        )).then(() => {
+          updated = true;
+          return rerender();
+        }).then(() => {
           const htmlTag = document.getElementsByTagName('html')[0];
 
           expect(htmlTag.getAttribute('lang')).to.equal(null);
           expect(htmlTag.getAttribute('amp')).to.equal(null);
           expect(htmlTag.getAttribute(HELMET_ATTRIBUTE)).to.equal(null);
-        })));
+        });
+      });
 
       it('updates with multiple additions and removals - overwrite and new', () => {
         const data = { updated: false };
@@ -704,8 +707,8 @@ describe('Helmet - Declarative API', () => {
         const filteredTags = [].slice
           .call(existingTags)
           .filter(tag => (
-            tag.getAttribute('href') ===
-                                'http://mysite.com/'
+            tag.getAttribute('href')
+                                === 'http://mysite.com/'
           ));
 
         expect(filteredTags.length).to.equal(1);
@@ -785,17 +788,17 @@ describe('Helmet - Declarative API', () => {
         const filteredTags = [].slice
           .call(existingTags)
           .filter(tag => (
-            tag.getAttribute('charset') === 'utf-8' ||
-                                (tag.getAttribute('name') === 'description' &&
-                                    tag.getAttribute('content') ===
-                                        'Test description') ||
-                                (tag.getAttribute('http-equiv') ===
-                                    'content-type' &&
-                                    tag.getAttribute('content') ===
-                                        'text/html') ||
-                                (tag.getAttribute('itemprop') === 'name' &&
-                                    tag.getAttribute('content') ===
-                                        'Test name itemprop')
+            tag.getAttribute('charset') === 'utf-8'
+                                || (tag.getAttribute('name') === 'description'
+                                    && tag.getAttribute('content')
+                                        === 'Test description')
+                                || (tag.getAttribute('http-equiv')
+                                    === 'content-type'
+                                    && tag.getAttribute('content')
+                                        === 'text/html')
+                                || (tag.getAttribute('itemprop') === 'name'
+                                    && tag.getAttribute('content')
+                                        === 'Test name itemprop')
           ));
 
         expect(filteredTags.length).to.be.at.least(4);
@@ -1033,13 +1036,13 @@ describe('Helmet - Declarative API', () => {
         const filteredTags = [].slice
           .call(existingTags)
           .filter(tag => (
-            (tag.getAttribute('href') ===
-                                    'http://localhost/style.css' &&
-                                    tag.getAttribute('rel') === 'stylesheet' &&
-                                    tag.getAttribute('type') === 'text/css') ||
-                                (tag.getAttribute('href') ===
-                                    'http://localhost/helmet' &&
-                                    tag.getAttribute('rel') === 'canonical')
+            (tag.getAttribute('href')
+                                    === 'http://localhost/style.css'
+                                    && tag.getAttribute('rel') === 'stylesheet'
+                                    && tag.getAttribute('type') === 'text/css')
+                                || (tag.getAttribute('href')
+                                    === 'http://localhost/helmet'
+                                    && tag.getAttribute('rel') === 'canonical')
           ));
 
         expect(filteredTags.length).to.be.at.least(2);
@@ -1406,17 +1409,17 @@ describe('Helmet - Declarative API', () => {
           const filteredTags = [].slice
             .call(existingTags)
             .filter(tag => (
-              (tag.getAttribute('src') ===
-                                    'http://localhost/test.js' &&
-                                    tag.getAttribute('type') ===
-                                        'text/javascript') ||
-                                (tag.getAttribute('src') ===
-                                    'http://localhost/test2.js' &&
-                                    tag.getAttribute('type') ===
-                                        'text/javascript') ||
-                                (tag.getAttribute('type') ===
-                                    'application/ld+json' &&
-                                    tag.innerHTML === scriptInnerHTML)
+              (tag.getAttribute('src')
+                                    === 'http://localhost/test.js'
+                                    && tag.getAttribute('type')
+                                        === 'text/javascript')
+                                || (tag.getAttribute('src')
+                                    === 'http://localhost/test2.js'
+                                    && tag.getAttribute('type')
+                                        === 'text/javascript')
+                                || (tag.getAttribute('type')
+                                    === 'application/ld+json'
+                                    && tag.innerHTML === scriptInnerHTML)
             ));
 
           expect(filteredTags.length).to.be.at.least(3);
@@ -1427,10 +1430,12 @@ describe('Helmet - Declarative API', () => {
         let updated = false;
         return render(h => (
           <Helmet>
-            {!updated && <script
+            {!updated && (
+            <script
               src="http://localhost/test.js"
               type="text/javascript"
-            />}
+            />
+            )}
           </Helmet>
         )).then(() => {
           updated = true;
@@ -1540,8 +1545,8 @@ describe('Helmet - Declarative API', () => {
 
           expect(existingTags).to.not.equal(undefined);
           expect(existingTags.length).to.equal(1);
-          expect(existingTags[0].innerHTML === noscriptInnerHTML &&
-                            existingTags[0].id === 'bar');
+          expect(existingTags[0].innerHTML === noscriptInnerHTML
+                            && existingTags[0].id === 'bar');
         });
       });
 
@@ -1894,7 +1899,8 @@ describe('Helmet - Declarative API', () => {
             <link // eslint-disable-line react/void-dom-elements-no-children
               href="http://localhost/helmet"
               rel="canonical"
-            >test
+            >
+              {'test'}
             </link>
           </Helmet>
         ),

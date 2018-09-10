@@ -67,8 +67,8 @@ function getTitleFromPropsList(propsList: Array<HelmetPropsType>): string | void
     : innermostTitle;
 }
 
-const getHandleClientStateChange =
-(propsList: Array<HelmetPropsType>): handleClientStateChangeType => (
+const getHandleClientStateChange = (propsList: Array<HelmetPropsType>):
+handleClientStateChangeType => (
   getInnermostProperty(propsList, HELMET_PROPS.HANDLE_CHANGE_CLIENT_STATE)
   || (() => {})
 );
@@ -265,24 +265,23 @@ const generateTitleAsString = (
   return `<title ${HELMET_ATTRIBUTE}="true"${attrs}>${escapeHtml(title)}</title>`;
 };
 
-const generateTagsAsString = (type: string, tags: Array<MapType>): string =>
-  tags.map((tag) => {
-    let attributeHtml = Object.keys(tag)
-      .filter(attribute => attribute !== 'innerHTML' && attribute !== 'cssText')
-      .map(attribute => (
-        tag[attribute] === undefined
-          ? attribute
-          : `${attribute}="${escapeHtml(tag[attribute])}"`
-      )).join(' ');
-    if (attributeHtml) attributeHtml = ` ${attributeHtml}`;
-    const isSelfClosing = SELF_CLOSING_TAGS.indexOf(type) === -1;
+const generateTagsAsString = (type: string, tags: Array<MapType>): string => tags.map((tag) => {
+  let attributeHtml = Object.keys(tag)
+    .filter(attribute => attribute !== 'innerHTML' && attribute !== 'cssText')
+    .map(attribute => (
+      tag[attribute] === undefined
+        ? attribute
+        : `${attribute}="${escapeHtml(tag[attribute])}"`
+    )).join(' ');
+  if (attributeHtml) attributeHtml = ` ${attributeHtml}`;
+  const isSelfClosing = SELF_CLOSING_TAGS.indexOf(type) === -1;
 
-    return `<${type} ${HELMET_ATTRIBUTE}="true"${attributeHtml}${
-      isSelfClosing
-        ? '/>'
-        : `>${tag.innerHTML || tag.cssText || ''}</${type}>`
-    }`;
-  }).join('');
+  return `<${type} ${HELMET_ATTRIBUTE}="true"${attributeHtml}${
+    isSelfClosing
+      ? '/>'
+      : `>${tag.innerHTML || tag.cssText || ''}</${type}>`
+  }`;
+}).join('');
 
 function convertVNodeDataToMap(data: VNodeDataType, initAttributes?: VNodeDataType = {}): MapType {
   const {

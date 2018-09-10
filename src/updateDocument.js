@@ -17,7 +17,7 @@ export function updateAttributes(
     ? helmetAttributeString.split(',')
     : [];
 
-  const attributesToRemove = new Set(helmetAttributes);
+  const attributesToRemove = [...helmetAttributes];
 
   const keys = Object.keys(attributes);
 
@@ -34,12 +34,15 @@ export function updateAttributes(
       helmetAttributes.push(attribute);
     }
 
-    attributesToRemove.delete(attribute);
+    const ix = attributesToRemove.indexOf(attribute);
+    if (ix !== -1) {
+      attributesToRemove.splice(ix, 1);
+    }
   });
 
   attributesToRemove.forEach(attr => elementTag.removeAttribute(attr));
 
-  if (helmetAttributes.length === attributesToRemove.size) {
+  if (helmetAttributes.length === attributesToRemove.length) {
     elementTag.removeAttribute(HELMET_ATTRIBUTE);
     return;
   }
@@ -75,7 +78,8 @@ export function updateTags(
   if (tags) {
     tags.forEach((tag) => {
       const newElement = document.createElement(type);
-      Object.entries(tag).forEach(([rawAttr, rawValue]) => {
+      Object.keys(tag).forEach((rawAttr) => {
+        const rawValue = tag[rawAttr];
         const value: string = (rawValue: any);
         const attribute: string = (rawAttr : any);
         if (attribute === 'innerHTML') {

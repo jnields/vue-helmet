@@ -9,13 +9,13 @@
       "@babel/preset-flow"
   ],
   "plugins": [
-    "@babel/plugin-transform-runtime"
+    "@babel/transform-runtime"
   ],
   "env": {
     "test": {
       "presets": [
         [
-          "@babel/preset-env",
+          "@babel/env",
           {
             "modules": "commonjs"
           }

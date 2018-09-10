@@ -6,6 +6,7 @@ export type VNodeType = {
   tag: string | void;
   data: VNodeDataType | void;
   children: ?Array<VNodeType>;
+  type: mixed;
   text: string | void;
   elm: Node | void;
   ns: string | void;

@@ -219,7 +219,11 @@ describe('server', () => {
 
     await render(h => (
       <Helmet>
-        <title>Title: {someValue}</title>
+        <title>
+          Title:
+          {' '}
+          {someValue}
+        </title>
       </Helmet>
     ));
 
