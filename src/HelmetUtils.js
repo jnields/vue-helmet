@@ -1,6 +1,4 @@
 // @flow
-import toStyle from 'to-style';
-import cs from 'classnames';
 import escapeHtml from 'escape-html';
 
 import {
@@ -294,10 +292,10 @@ function convertVNodeDataToMap(data: VNodeDataType, initAttributes?: VNodeDataTy
     cssText, innerHTML,
   } = { ...initDomProps, ...domProps };
   const result = {};
-  if (style || initStyle) result.style = toStyle.string(style || initStyle);
+  if (style || initStyle) result.style = style || initStyle;
   if (innerHTML) result.innerHTML = innerHTML;
   if (cssText) result.cssText = cssText;
-  if (className || initClassName) result.class = cs(className || initClassName);
+  if (className || initClassName) result.class = className || initClassName;
   return {
     ...result,
     ...initAttrs,
