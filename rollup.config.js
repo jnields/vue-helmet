@@ -1,22 +1,32 @@
 import rollupPluginBabel from 'rollup-plugin-babel';
 import { dependencies } from './package.json';
 
-export default {
+const getConfig = es => ({
   input: './src/index.js',
   output: [
     {
-      file: 'dist/index.js',
-      format: 'cjs',
-      sourcemap: true,
-    },
-    {
-      file: 'dist/index.mjs',
-      format: 'es',
+      file: `dist/index${es ? '.es' : ''}.js`,
+      format: es ? 'es' : 'cjs',
       sourcemap: true,
     },
   ],
   plugins: [
-    rollupPluginBabel({ runtimeHelpers: true }),
+    rollupPluginBabel({
+      babelrc: false,
+      runtimeHelpers: true,
+      presets: [
+        ['@babel/env', { modules: false }],
+        '@babel/flow',
+      ],
+      plugins: [
+        [
+          '@babel/transform-runtime',
+          { useESModules: es },
+        ],
+      ],
+    }),
   ],
   external: id => Object.keys(dependencies).some(dep => id === dep || id.startsWith(`${dep}/`)),
-};
+});
+
+export default [getConfig(true), getConfig(false)];

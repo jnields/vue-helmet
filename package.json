@@ -3,7 +3,7 @@
   "description": "A document head manager for Vue",
   "version": "3.0.0-rc.1",
   "main": "dist/index.js",
-  "module": "dist/index.mjs",
+  "module": "dist/index.es.js",
   "files": [
     "dist",
     "src"
@@ -98,6 +98,7 @@
   "scripts": {
     "changelog": "conventional-changelog -p angular -i CHANGELOG.md -s",
     "clean": "rimraf dist coverage .nyc_output",
+    "prebuild": "npm run clean",
     "build": "rollup -c",
     "lint": "eslint --ignore-path .gitignore .",
     "pretest": "npm run lint && flow check",
